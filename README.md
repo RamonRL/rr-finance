@@ -1,0 +1,2 @@
+# finance
+Personal finances repository.
