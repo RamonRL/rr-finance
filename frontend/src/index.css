@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg-base: #080f1a;
+  --bg-surface: #0e1c2f;
+  --bg-elevated: #162540;
+  --bg-overlay: rgba(14,28,47,0.85);
+
+  --accent-green: #00c896;
+  --accent-red: #ff5c5c;
+  --accent-blue: #3d9eff;
+  --accent-gold: #f0b429;
+
+  --text-primary: #e8f0f8;
+  --text-secondary: #7a95b2;
+  --text-muted: #3d5a78;
+
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.10);
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Outfit', sans-serif;
+}
+
+/* Thin scrollbar: 4px, muted thumb, transparent track */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Streamer Mode */
+.streamer .private {
+  filter: blur(8px);
+  transition: filter 0.2s ease;
+  user-select: none;
+}
+
+.private {
+  transition: filter 0.2s ease;
+}
+
+/* Force dark color scheme on all form controls */
+input, select, textarea {
+  color-scheme: dark;
+}
+
+/* Tabular nums for financial values */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
