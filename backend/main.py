@@ -5,6 +5,7 @@ from datetime import date, datetime
 from typing import Optional
 from collections import defaultdict
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,21 +13,18 @@ from sqlalchemy import text
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from dateutil.relativedelta import relativedelta
 
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Database setup
 # ---------------------------------------------------------------------------
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Set default DATA_DIR to <repo_root>/databases
-DATA_DIR = os.getenv(
-    "DATA_DIR",
-    os.path.join(REPO_ROOT, "databases")
-)
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is not set")
 
-DB_PATH = os.path.join(DATA_DIR, "rr_finance.db")
-engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+engine = create_engine(DATABASE_URL)
 
 
 # ---------------------------------------------------------------------------
@@ -104,10 +102,11 @@ def create_db():
             conn.commit()
 
         # Remove Common account (id=2): migrate its data to Personal (id=1)
-        conn.execute(text('UPDATE "transaction" SET account_id = 1 WHERE account_id = 2'))
-        conn.execute(text("DELETE FROM transfer WHERE from_account_id = 2 OR to_account_id = 2"))
-        conn.execute(text("DELETE FROM account WHERE id = 2"))
-        conn.commit()
+        with contextlib.suppress(Exception):
+            conn.execute(text('UPDATE "transaction" SET account_id = 1 WHERE account_id = 2'))
+            conn.execute(text("DELETE FROM transfer WHERE from_account_id = 2 OR to_account_id = 2"))
+            conn.execute(text("DELETE FROM account WHERE id = 2"))
+            conn.commit()
 
     # --- Phase 2: Create all tables ---
     SQLModel.metadata.create_all(engine)
@@ -192,9 +191,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="RR Finance API", version="0.1.0", lifespan=lifespan)
 
+origins = [
+    os.getenv("FRONTEND_URL", "http://localhost:5173"),
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -601,3 +606,9 @@ def get_investments_summary():
             for k, v in monthly.items()
         ],
     }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

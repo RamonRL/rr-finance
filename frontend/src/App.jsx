@@ -9,8 +9,6 @@ import CashflowPage from './pages/CashflowPage';
 import AnimatedBackground from './AnimatedBackground';
 import { AccountProvider, useAccount } from './AccountContext';
 
-export const API_URL = 'http://localhost:8001';
-
 const NAV_LINKS = [
   { to: '/', label: 'Dashboard' },
   { to: '/transactions', label: 'Transactions' },
