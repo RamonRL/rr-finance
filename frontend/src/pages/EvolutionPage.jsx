@@ -250,6 +250,12 @@ export default function EvolutionPage() {
     persistEv({ ...evData, [key]: { ...prev, price: isNaN(p) ? null : p, priceIsManual: p != null } });
   }, [evData, persistEv]);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleCurrentPriceChange = useCallback((assetName, rawValue) => {
+    const key = `${assetName}___current`;
+    const p = rawValue === '' ? null : parseFloat(rawValue);
+    persistEv({ ...evData, [key]: { price: isNaN(p) ? null : p } });
+  }, [evData, persistEv]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   const [apiKeys, persistApiKeys] = useStore('rr_finance_api_keys', { fmp: '' });
   const [showKeyConfig, setShowKeyConfig] = useState(false);
   const [fmpKeyInput, setFmpKeyInput] = useState('');
@@ -304,6 +310,7 @@ export default function EvolutionPage() {
           const price = await fetchCoinGeckoPrice(meta.ticker);
           if (price != null) {
             newPrices[evKey] = { price, priceIsManual: true, priceSource: 'refresh' };
+            newPrices[`${name}___current`] = { price };
             items.push({ name, status: 'updated', price, currency: 'EUR' });
           } else {
             items.push({ name, status: 'unavailable', reason: 'no data returned' });
@@ -316,6 +323,7 @@ export default function EvolutionPage() {
             items.push({ name, status: 'unavailable', reason: result.reason || 'no price' });
           } else {
             newPrices[evKey] = { price: result.price, priceIsManual: true, priceSource: 'refresh' };
+            newPrices[`${name}___current`] = { price: result.price };
             items.push({ name, status: 'updated', price: result.price, currency: result.currency });
           }
         }
@@ -334,16 +342,19 @@ export default function EvolutionPage() {
     return assetNames.map((name) => {
       const meta = dcaByAsset[name];
       let totalN = 0;
-      let latestPrice = null;
+      let lastMonthPrice = null;
       let totalContributed = 0;
 
       allMonths.forEach((m) => {
         const n = dcaByAsset[name]?.participations?.[m] || 0;
         totalN += n;
         const { value: p } = getPrice(name, m);
-        if (p != null) latestPrice = p;
+        if (p != null) lastMonthPrice = p;
         totalContributed += meta.months[m] || 0;
       });
+
+      const currentOverride = evData[`${name}___current`]?.price;
+      const latestPrice = currentOverride != null ? currentOverride : lastMonthPrice;
 
       const totalEur = totalN * (latestPrice ?? 0);
       const pnlEur = totalEur - totalContributed;
@@ -510,10 +521,13 @@ export default function EvolutionPage() {
                     <span className="text-secondary">Total N</span>
                     <span className="text-white tabular-nums">{fmtN(row.totalN)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-secondary">Latest price</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-secondary">Current price</span>
                     <span className="text-white tabular-nums private">
                       {row.latestPrice != null ? fmtEur(row.latestPrice) : '—'}
+                      {evData[`${row.name}___current`]?.price != null && (
+                        <span className="ml-1 text-[9px] text-accent-gold/70">✎</span>
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -714,9 +728,24 @@ export default function EvolutionPage() {
                       <td className="px-4 py-3 text-right tabular-nums text-white" style={stickyStyle(1)}>
                         {fmtN(row.totalN)}
                       </td>
-                      {/* Latest price */}
-                      <td className="px-4 py-3 text-right tabular-nums text-white private" style={stickyStyle(2)}>
-                        {row.latestPrice != null ? fmtEur(row.latestPrice) : '—'}
+                      {/* Latest price — editable */}
+                      <td className="px-2 py-2 text-right tabular-nums text-white private" style={stickyStyle(2)}>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            placeholder={row.latestPrice != null ? row.latestPrice.toFixed(2) : '—'}
+                            value={evData[`${row.name}___current`]?.price != null ? evData[`${row.name}___current`].price : ''}
+                            onChange={(e) => handleCurrentPriceChange(row.name, e.target.value)}
+                            title="Current price — leave blank to use last month's price"
+                            className={[inputCls, evData[`${row.name}___current`]?.price != null ? 'border-accent-gold/40' : ''].join(' ')}
+                            style={{ minWidth: 0, width: '100%' }}
+                          />
+                          {evData[`${row.name}___current`]?.price != null && (
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-accent-gold/60 pointer-events-none" title="Current price override">✎</span>
+                          )}
+                        </div>
                       </td>
                       {/* Total € */}
                       <td className="px-4 py-3 text-right tabular-nums text-white private" style={stickyStyle(3)}>
