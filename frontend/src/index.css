@@ -67,3 +67,7 @@ input, select, textarea {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Hide scrollbar but keep scrollability (used for mobile nav) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
