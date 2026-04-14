@@ -245,7 +245,7 @@ def get_investment_types():
 @app.get("/accounts", response_model=list[Account])
 def list_accounts():
     with Session(engine) as session:
-        return session.exec(select(Account)).all()
+        return session.exec(select(Account).order_by(Account.id)).all()
 
 
 @app.patch("/accounts/{account_id}", response_model=Account)

@@ -17,7 +17,7 @@ export function AccountProvider({ children }) {
           setAccounts(data);
           // Keep selected account in sync with fresh data
           setSelectedAccount(prev =>
-            prev ? (data.find(a => a.id === prev.id) ?? data[0]) : data[0]
+            prev ? (data.find(a => a.id === prev.id) ?? data[0]) : (data.find(a => a.name === 'Personal') ?? data[0])
           );
         }
       })
