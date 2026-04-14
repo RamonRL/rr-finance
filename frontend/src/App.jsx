@@ -1,6 +1,4 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
-import { getStore, setStore } from './api/store';
 import HomePage from './pages/HomePage';
 import TransactionsPage from './pages/TransactionsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
@@ -125,40 +123,7 @@ function AppContent() {
   );
 }
 
-const LS_KEYS_TO_MIGRATE = [
-  'rr-finance-dca-contributions',
-  'rr-finance-evolution-data',
-  'rr-finance-distribution-targets',
-  'rr-predictions-config',
-  'rr-savings-deposits',
-  'rr-savings-snapshots',
-  'rr-savings-premiums',
-  'rr-cashflow-data',
-  'rr_finance_api_keys',
-];
-
 function App() {
-  useEffect(() => {
-    // Self-healing migration: for each key, if localStorage has data but the
-    // backend store is empty, push the local data. Safe to run on every load.
-    LS_KEYS_TO_MIGRATE.forEach(async (key) => {
-      const raw = localStorage.getItem(key);
-      if (!raw) return;
-      let localValue;
-      try { localValue = JSON.parse(raw); } catch { return; }
-
-      const remoteValue = await getStore(key, null);
-      const remoteEmpty =
-        remoteValue === null ||
-        (Array.isArray(remoteValue) && remoteValue.length === 0) ||
-        (typeof remoteValue === 'object' && !Array.isArray(remoteValue) && Object.keys(remoteValue).length === 0);
-
-      if (remoteEmpty) {
-        const ok = await setStore(key, localValue);
-        if (ok) console.log(`[RR Finance] migrated "${key}" to backend store`);
-      }
-    });
-  }, []);
 
   return (
     <Router>

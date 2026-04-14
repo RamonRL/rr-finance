@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import text
+from sqlalchemy.pool import NullPool
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from dateutil.relativedelta import relativedelta
 
@@ -25,7 +26,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL environment variable is not set")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, poolclass=NullPool)
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +206,7 @@ app = FastAPI(title="RR Finance API", version="0.1.0", lifespan=lifespan)
 origins = [
     os.getenv("FRONTEND_URL", "http://localhost:5173"),
     "http://localhost:5173",
+    "http://localhost:5174",
     "http://localhost:3000",
 ]
 
