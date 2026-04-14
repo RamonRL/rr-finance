@@ -17,8 +17,14 @@ from dateutil.relativedelta import relativedelta
 # Database setup
 # ---------------------------------------------------------------------------
 
-DATA_DIR = os.getenv("DATA_DIR", os.path.expanduser("~/.rr-finance"))
-os.makedirs(DATA_DIR, exist_ok=True)
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+
+# Set default DATA_DIR to <repo_root>/databases
+DATA_DIR = os.getenv(
+    "DATA_DIR",
+    os.path.join(REPO_ROOT, "databases")
+)
+
 DB_PATH = os.path.join(DATA_DIR, "rr_finance.db")
 engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 
