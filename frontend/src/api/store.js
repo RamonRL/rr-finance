@@ -12,12 +12,16 @@ export async function getStore(key, fallback = null) {
   }
 }
 
+// Returns true on success, false on failure.
 export async function setStore(key, value) {
   try {
-    await fetch(`${API_URL}/store/${encodeURIComponent(key)}`, {
+    const res = await fetch(`${API_URL}/store/${encodeURIComponent(key)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value }),
     });
-  } catch { /* ignore — state already updated in memory */ }
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
