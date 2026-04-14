@@ -141,13 +141,15 @@ const HomePage = () => {
   const assetRows = useMemo(() => {
     return assetNames.map(name => {
       const meta = dcaByAsset[name];
-      let totalN = 0, latestPrice = null, totalContributed = 0;
+      let totalN = 0, lastMonthPrice = null, totalContributed = 0;
       allMonths.forEach(m => {
         totalN += dcaByAsset[name]?.participations?.[m] || 0;
         const p = getPrice(name, m);
-        if (p != null) latestPrice = p;
+        if (p != null) lastMonthPrice = p;
         totalContributed += meta.months[m] || 0;
       });
+      const currentOverride = evData[`${name}___current`]?.price;
+      const latestPrice = currentOverride != null ? currentOverride : lastMonthPrice;
       const totalEur = totalN * (latestPrice ?? 0);
       const pnlEur = totalEur - totalContributed;
       const pnlPct = totalContributed > 0 ? (pnlEur / totalContributed) * 100 : null;
