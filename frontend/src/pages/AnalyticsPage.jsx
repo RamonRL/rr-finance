@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useStore } from '../hooks/useStore';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
   LineChart, Line, PieChart, Pie, Cell, CartesianGrid,
@@ -11,15 +12,11 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const COLORS = ['#00c896','#3d9eff','#f0b429','#ec4899','#8b5cf6','#14b8a6','#ff5c5c','#a3e635','#fb923c','#e879f9'];
 const ALL_CATEGORIES = ['Housing','Food & Groceries','Transport','Health','Entertainment','Shopping','Utilities','Subscriptions','Travel','Music','Fuel','Bizum','Gambling','Investments','Common','Other','Salary','Investment','Gift','Refund'];
 
-// ── Investments (localStorage) ────────────────────────────────────────────────
+// ── Investments (backend store) ───────────────────────────────────────────────
 const DCA_KEY = 'rr-finance-dca-contributions';
 const EVO_KEY = 'rr-finance-evolution-data';
 const START_MONTH = '2026-02';
 
-const loadJson = (key, fallback) => {
-  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-  catch { return fallback; }
-};
 
 const fmtEur = (v) => `€${Number(v).toFixed(0)}`;
 
@@ -56,9 +53,9 @@ export default function AnalyticsPage() {
   const [catFilter, setCatFilter] = useState('Food & Groceries');
   const [catMonthly, setCatMonthly] = useState([]);
 
-  // Investments — read from localStorage (same source as EvolutionPage)
-  const [contributions] = useState(() => loadJson(DCA_KEY, []));
-  const [evData] = useState(() => loadJson(EVO_KEY, {}));
+  // Investments — read from backend store (same source as EvolutionPage)
+  const [contributions] = useStore(DCA_KEY, []);
+  const [evData] = useStore(EVO_KEY, {});
 
   const dcaByAsset = useMemo(() => {
     const map = {};

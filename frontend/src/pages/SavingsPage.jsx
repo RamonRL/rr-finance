@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useStore } from '../hooks/useStore';
 import {
   LineChart, Line, BarChart, Bar, ComposedChart,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
@@ -29,10 +30,6 @@ const deleteTx = async (id) => {
   await fetch(`${API_URL}/transactions/${id}`, { method: 'DELETE' }).catch(() => {});
 };
 
-const loadJson = (key, fb) => {
-  try { return JSON.parse(localStorage.getItem(key)) ?? fb; } catch { return fb; }
-};
-const saveJson = (key, v) => localStorage.setItem(key, JSON.stringify(v));
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -125,9 +122,9 @@ function StatusBadge({ status }) {
 export default function SavingsPage() {
   // ── Data state ───────────────────────────────────────────────────────────────
   const [balance, setBalance] = useState(null);
-  const [deposits, setDeposits] = useState(() => loadJson(DEPOSITS_KEY, []));
-  const [snapshots, setSnapshots] = useState(() => loadJson(SNAPSHOTS_KEY, []));
-  const [premiums, setPremiums] = useState(() => loadJson(PREMIUMS_KEY, []));
+  const [deposits, setDeposits] = useStore(DEPOSITS_KEY, []);
+  const [snapshots, setSnapshots] = useStore(SNAPSHOTS_KEY, []);
+  const [premiums, setPremiums] = useStore(PREMIUMS_KEY, []);
 
   // ── Deposit form ─────────────────────────────────────────────────────────────
   const [depDate, setDepDate] = useState(new Date().toISOString().slice(0, 10));
@@ -154,9 +151,9 @@ export default function SavingsPage() {
   const [editSnap, setEditSnap] = useState({});
 
   // ── Persist helpers ──────────────────────────────────────────────────────────
-  const persistDeposits = (d) => { setDeposits(d); saveJson(DEPOSITS_KEY, d); };
-  const persistSnapshots = (d) => { setSnapshots(d); saveJson(SNAPSHOTS_KEY, d); };
-  const persistPremiums = (d) => { setPremiums(d); saveJson(PREMIUMS_KEY, d); };
+  const persistDeposits = (d) => { setDeposits(d); };
+  const persistSnapshots = (d) => { setSnapshots(d); };
+  const persistPremiums = (d) => { setPremiums(d); };
 
   const [balanceTick, setBalanceTick] = useState(0);
   const [txHistory, setTxHistory] = useState([]);

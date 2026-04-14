@@ -3,9 +3,10 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Legend,
 } from 'recharts';
+import { useStore } from '../hooks/useStore';
+import { getStore, setStore } from '../api/store';
 
-const STORAGE_KEY = 'rr-finance-dca-contributions';
-const EVO_KEY     = 'rr-finance-evolution-data';
+const EVO_KEY = 'rr-finance-evolution-data';
 const START_MONTH = '2026-02';
 
 const DCA_TYPES = ['Indexed Fund', 'ETF', 'Crypto', 'Gold', 'Other'];
@@ -32,13 +33,6 @@ const fmtMonth = (ym) => {
   return new Date(y, m - 1).toLocaleString('en-US', { month: 'short', year: 'numeric' });
 };
 
-const loadContributions = () => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-  catch { return []; }
-};
-
-const saveContributions = (items) =>
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 
 const CURRENT_MONTH = new Date().toISOString().slice(0, 7);
 
@@ -105,12 +99,12 @@ const BarTooltip = ({ active, payload, label }) => {
 };
 
 const DcaPage = () => {
-  const [contributions, setContributions] = useState(loadContributions);
+  const [contributions, persistContributions] = useStore('rr-finance-dca-contributions', []);
   const [activeTab, setActiveTab] = useState('existing');
   const [existingForm, setExistingForm] = useState(EMPTY_EXISTING_FORM);
   const [newForm, setNewForm] = useState(EMPTY_NEW_FORM);
 
-  const persist = (next) => { setContributions(next); saveContributions(next); };
+  const persist = (next) => { persistContributions(next); };
 
   const handleSubmitExisting = (e) => {
     e.preventDefault();
@@ -177,14 +171,13 @@ const DcaPage = () => {
 
     // Migrate Evolution price keys if name changed
     if (newName !== oldName) {
-      try {
-        const evRaw = JSON.parse(localStorage.getItem(EVO_KEY)) || {};
+      getStore(EVO_KEY, {}).then(evRaw => {
         const evNext = {};
         Object.entries(evRaw).forEach(([k, v]) => {
           evNext[k.startsWith(`${oldName}___`) ? `${newName}___${k.slice(oldName.length + 3)}` : k] = v;
         });
-        localStorage.setItem(EVO_KEY, JSON.stringify(evNext));
-      } catch {}
+        setStore(EVO_KEY, evNext);
+      });
     }
 
     setEditingAsset(null);

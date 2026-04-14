@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useStore } from '../hooks/useStore';
 import {
   ComposedChart, Area, LineChart, Line,
   PieChart, Pie, Cell,
@@ -38,10 +39,6 @@ const fmtMonth = (ym) => {
   return new Date(Number(y), Number(m) - 1).toLocaleString('en-US', { month: 'short', year: '2-digit' });
 };
 
-const loadJson = (key, fallback) => {
-  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-  catch { return fallback; }
-};
 
 const FIXED_COLS = [
   { key: 'asset',    label: 'Asset',    width: 180, align: 'left'  },
@@ -198,14 +195,9 @@ async function fetchCoinGeckoPrice(ticker) {
 }
 
 export default function EvolutionPage() {
-  const [contributions] = useState(() => loadJson(DCA_KEY, []));
-  const [evData, setEvData] = useState(() => loadJson(EVO_KEY, {}));
+  const [contributions] = useStore(DCA_KEY, []);
+  const [evData, persistEv] = useStore(EVO_KEY, {});
   const [selectedAsset, setSelectedAsset] = useState('');
-
-  const persistEv = useCallback((next) => {
-    setEvData(next);
-    localStorage.setItem(EVO_KEY, JSON.stringify(next));
-  }, []);
 
   // DCA meta per asset
   const dcaByAsset = useMemo(() => {
@@ -256,19 +248,22 @@ export default function EvolutionPage() {
     const prev = evData[key] || { price: null, priceIsManual: false };
     const p = rawValue === '' ? null : parseFloat(rawValue);
     persistEv({ ...evData, [key]: { ...prev, price: isNaN(p) ? null : p, priceIsManual: p != null } });
-  }, [evData, persistEv]);
+  }, [evData, persistEv]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  const API_KEYS_KEY = 'rr_finance_api_keys';
-  const [apiKeys, setApiKeys] = useState(() => loadJson(API_KEYS_KEY, { fmp: '' }));
+  const [apiKeys, persistApiKeys] = useStore('rr_finance_api_keys', { fmp: '' });
   const [showKeyConfig, setShowKeyConfig] = useState(false);
-  const [fmpKeyInput, setFmpKeyInput] = useState(() => loadJson(API_KEYS_KEY, { fmp: '' }).fmp || '');
+  const [fmpKeyInput, setFmpKeyInput] = useState('');
+
+  // Seed fmpKeyInput once apiKeys loads
+  useEffect(() => {
+    if (apiKeys?.fmp && !fmpKeyInput) setFmpKeyInput(apiKeys.fmp);
+  }, [apiKeys]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveApiKeys = useCallback(() => {
     const next = { fmp: fmpKeyInput.trim() };
-    setApiKeys(next);
-    localStorage.setItem(API_KEYS_KEY, JSON.stringify(next));
+    persistApiKeys(next);
     setShowKeyConfig(false);
-  }, [fmpKeyInput]);
+  }, [fmpKeyInput, persistApiKeys]);
 
   const [refreshing, setRefreshing] = useState(false);
   // refreshResult: { items: [{ name, status: 'updated'|'skipped'|'unavailable', reason?, price?, currency? }] }

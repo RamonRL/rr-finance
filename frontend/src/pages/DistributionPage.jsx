@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useStore } from '../hooks/useStore';
 
 const DCA_KEY    = 'rr-finance-dca-contributions';
 const EVO_KEY    = 'rr-finance-evolution-data';
@@ -16,10 +17,6 @@ const TYPE_COLORS = {
 const fmtEur = (v) =>
   new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 
-const loadJson = (key, fallback) => {
-  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-  catch { return fallback; }
-};
 
 const devColor = (dev) => {
   if (dev == null) return '#7a95b2';
@@ -33,9 +30,9 @@ const fmtDev = (dev) =>
   dev == null ? '—' : `${dev >= 0 ? '+' : ''}${dev.toFixed(2)}%`;
 
 export default function DistributionPage() {
-  const [contributions] = useState(() => loadJson(DCA_KEY, []));
-  const [evData]        = useState(() => loadJson(EVO_KEY, {}));
-  const [savedTargets, setSavedTargets]   = useState(() => loadJson(DIST_KEY, null));
+  const [contributions] = useStore(DCA_KEY, []);
+  const [evData]        = useStore(EVO_KEY, {});
+  const [savedTargets, persistTargets]    = useStore(DIST_KEY, null);
   const [justSaved, setJustSaved]         = useState(false);
 
   // ── DCA-derived data ──────────────────────────────────────────────────────
@@ -107,28 +104,26 @@ export default function DistributionPage() {
   [assetNames, assetValueMap]);
 
   // ── Left panel inputs ─────────────────────────────────────────────────────
-  const [typeInputs, setTypeInputs] = useState(() => {
-    const saved = loadJson(DIST_KEY, null);
-    if (saved?.typeTargets) {
-      return Object.fromEntries(
-        Object.entries(saved.typeTargets).map(([k, v]) => [k, String(v)])
-      );
-    }
-    return {};
-  });
+  const [typeInputs, setTypeInputs] = useState({});
+  const [assetInputs, setAssetInputs] = useState({});
 
-  const [assetInputs, setAssetInputs] = useState(() => {
-    const saved = loadJson(DIST_KEY, null);
-    if (saved?.assetTargets) {
-      return Object.fromEntries(
-        Object.entries(saved.assetTargets).map(([type, assets]) => [
+  // Seed inputs from saved targets once they load from the backend
+  useEffect(() => {
+    if (!savedTargets) return;
+    if (savedTargets.typeTargets) {
+      setTypeInputs(Object.fromEntries(
+        Object.entries(savedTargets.typeTargets).map(([k, v]) => [k, String(v)])
+      ));
+    }
+    if (savedTargets.assetTargets) {
+      setAssetInputs(Object.fromEntries(
+        Object.entries(savedTargets.assetTargets).map(([type, assets]) => [
           type,
           Object.fromEntries(Object.entries(assets).map(([a, v]) => [a, String(v)])),
         ])
-      );
+      ));
     }
-    return {};
-  });
+  }, [savedTargets]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Seed inputs for types/assets added since last save
   useEffect(() => {
@@ -188,8 +183,7 @@ export default function DistributionPage() {
       ])
     );
     const targets = { typeTargets, assetTargets };
-    setSavedTargets(targets);
-    localStorage.setItem(DIST_KEY, JSON.stringify(targets));
+    persistTargets(targets);
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 2000);
   }, [isValid, typeNames, typeInputs, typeGroups, assetInputs]);

@@ -1,8 +1,9 @@
 import os
+import json
 import contextlib
 from contextlib import asynccontextmanager
 from datetime import date, datetime
-from typing import Optional
+from typing import Any, Optional
 from collections import defaultdict
 
 from dotenv import load_dotenv
@@ -86,6 +87,12 @@ class Investment(SQLModel, table=True):
     broker: str = "MyInvestor"
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AppStore(SQLModel, table=True):
+    __tablename__ = "app_store"
+    key: str = Field(primary_key=True)
+    value: Optional[str] = None  # JSON-encoded value
 
 
 def create_db():
@@ -177,6 +184,10 @@ class InvestmentUpdate(BaseModel):
     current_price: Optional[float] = None
     broker: Optional[str] = None
     notes: Optional[str] = None
+
+
+class StoreBody(BaseModel):
+    value: Any
 
 
 # ---------------------------------------------------------------------------
@@ -606,6 +617,34 @@ def get_investments_summary():
             for k, v in monthly.items()
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# Key-value store (replaces browser localStorage for cross-device persistence)
+# ---------------------------------------------------------------------------
+
+@app.get("/store/{key}")
+def get_store_value(key: str):
+    with Session(engine) as session:
+        row = session.get(AppStore, key)
+        if not row or row.value is None:
+            raise HTTPException(status_code=404, detail="Key not found")
+        try:
+            return {"value": json.loads(row.value)}
+        except Exception:
+            return {"value": row.value}
+
+
+@app.put("/store/{key}")
+def put_store_value(key: str, body: StoreBody):
+    with Session(engine) as session:
+        row = session.get(AppStore, key)
+        if not row:
+            row = AppStore(key=key)
+        row.value = json.dumps(body.value)
+        session.add(row)
+        session.commit()
+        return {"ok": True}
 
 
 if __name__ == "__main__":

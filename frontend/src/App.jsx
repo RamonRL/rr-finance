@@ -1,4 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
+import { setStore } from './api/store';
 import HomePage from './pages/HomePage';
 import TransactionsPage from './pages/TransactionsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
@@ -123,7 +125,39 @@ function AppContent() {
   );
 }
 
+const LS_KEYS_TO_MIGRATE = [
+  'rr-finance-dca-contributions',
+  'rr-finance-evolution-data',
+  'rr-finance-distribution-targets',
+  'rr-predictions-config',
+  'rr-savings-deposits',
+  'rr-savings-snapshots',
+  'rr-savings-premiums',
+  'rr-cashflow-data',
+  'rr_finance_api_keys',
+];
+
 function App() {
+  useEffect(() => {
+    const MIGRATED_FLAG = 'rr-store-migrated-v1';
+    if (localStorage.getItem(MIGRATED_FLAG)) return;
+
+    const tasks = LS_KEYS_TO_MIGRATE.flatMap(key => {
+      const raw = localStorage.getItem(key);
+      if (!raw) return [];
+      try {
+        return [setStore(key, JSON.parse(raw))];
+      } catch {
+        return [];
+      }
+    });
+
+    Promise.all(tasks).then(() => {
+      localStorage.setItem(MIGRATED_FLAG, '1');
+      console.log('[RR Finance] localStorage migrated to backend store.');
+    });
+  }, []);
+
   return (
     <Router>
       <AccountProvider>

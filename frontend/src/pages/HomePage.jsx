@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { API_URL } from '../constants';
 import { useAccount } from '../AccountContext';
+import { useStore } from '../hooks/useStore';
 
 const now = new Date();
 const fmtEur = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v);
@@ -11,7 +12,7 @@ const pnlColor = (v) => (v == null ? '#7a95b2' : v >= 0 ? '#00c896' : '#ff5c5c')
 
 const TOP_BAR_COLORS = ['#00c896', '#3d9eff', '#3d9eff', '#f0b429', '#f0b429'];
 
-// ── Investments (localStorage) ────────────────────────────────────────────────
+// ── Investments (backend store) ───────────────────────────────────────────────
 const DCA_KEY = 'rr-finance-dca-contributions';
 const EVO_KEY = 'rr-finance-evolution-data';
 const START_MONTH = '2026-02';
@@ -24,10 +25,6 @@ const TYPE_COLORS = {
   Other: '#7a95b2',
 };
 
-const loadJson = (key, fallback) => {
-  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
-  catch { return fallback; }
-};
 
 // ── Components ────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, color, icon, valueColor }) {
@@ -70,9 +67,9 @@ const HomePage = () => {
   const [availableMonths, setAvailableMonths] = useState([]);
   const [monthsRange, setMonthsRange] = useState(6);
 
-  // Investments — read once from localStorage (same source as EvolutionPage)
-  const [contributions] = useState(() => loadJson(DCA_KEY, []));
-  const [evData] = useState(() => loadJson(EVO_KEY, {}));
+  // Investments — read from backend store (same source as EvolutionPage)
+  const [contributions] = useStore(DCA_KEY, []);
+  const [evData] = useStore(EVO_KEY, {});
 
   useEffect(() => {
     if (!selectedAccount) return;

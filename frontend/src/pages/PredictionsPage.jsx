@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useStore } from '../hooks/useStore';
+import { getStore } from '../api/store';
 import {
   AreaChart, Area, BarChart, Bar,
   PieChart, Pie, Cell,
@@ -15,8 +17,6 @@ const DCA_START      = '2026-02';
 
 import { API_URL } from '../constants';
 
-const loadJson = (k, fb) => { try { return JSON.parse(localStorage.getItem(k)) ?? fb; } catch { return fb; } };
-const saveJson  = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const fmtEur = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v ?? 0);
@@ -155,12 +155,11 @@ const SECTION_LABELS = { income: 'Income', allocation: 'Allocation', savings: 'S
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function PredictionsPage() {
-  const [cfg, setCfg] = useState(() => ({ ...DEFAULT_CONFIG, ...loadJson(PRED_KEY, {}) }));
+  const [cfg, persistCfg] = useStore(PRED_KEY, DEFAULT_CONFIG);
 
   const updateCfg = (patch) => {
-    const next = { ...cfg, ...patch };
-    setCfg(next);
-    saveJson(PRED_KEY, next);
+    const next = { ...DEFAULT_CONFIG, ...cfg, ...patch };
+    persistCfg(next);
   };
 
   const num = (v) => (v === '' || v == null) ? null : parseFloat(v);
@@ -178,50 +177,49 @@ export default function PredictionsPage() {
           if (acc) setCurrentSavings(acc.balance);
         }
       }).catch(() => {});
-    // Keep "as of" date from latest snapshot month
-    const snaps = loadJson(SNAPSHOTS_KEY, []);
-    if (snaps.length) {
-      const latest = [...snaps].sort((a, b) => b.month.localeCompare(a.month))[0];
-      setLatestSnapMonth(latest?.month ?? null);
-    }
+    getStore(SNAPSHOTS_KEY, []).then(snaps => {
+      if (snaps.length) {
+        const latest = [...snaps].sort((a, b) => b.month.localeCompare(a.month))[0];
+        setLatestSnapMonth(latest?.month ?? null);
+      }
+    });
   }, []);
 
-  const currentInvestments = useMemo(() => {
-    const contributions = loadJson(DCA_KEY, []);
-    const evData        = loadJson(EVO_KEY, {});
-    const dcaByAsset    = {};
-    contributions.filter(c => c.month >= DCA_START).forEach(c => {
-      if (!dcaByAsset[c.assetName]) dcaByAsset[c.assetName] = { months: {}, participations: {} };
-      const a = dcaByAsset[c.assetName];
-      a.months[c.month] = (a.months[c.month] || 0) + c.amount;
-      a.participations[c.month] = (a.participations[c.month] || 0) + (c.participations || 0);
-    });
-    const allMonths = [...new Set(contributions.filter(c => c.month >= DCA_START).map(c => c.month))].sort();
-    let total = 0;
-    Object.keys(dcaByAsset).forEach(name => {
-      let totalN = 0, latestPrice = null;
-      allMonths.forEach(m => {
-        totalN += dcaByAsset[name]?.participations?.[m] || 0;
-        const ev = evData[`${name}___${m}`];
-        let price = null;
-        if (ev?.priceIsManual && ev.priceSource !== 'refresh' && ev.price != null) price = ev.price;
-        else {
-          const n = dcaByAsset[name]?.participations?.[m] || 0;
-          const amt = dcaByAsset[name]?.months?.[m];
-          if (n > 0 && amt != null) price = amt / n;
-          else if (ev?.price != null) price = ev.price;
-        }
-        if (price != null) latestPrice = price;
+  const [currentInvestments, setCurrentInvestments] = useState(0);
+  const [latestInvMonth, setLatestInvMonth] = useState(null);
+
+  useEffect(() => {
+    Promise.all([getStore(DCA_KEY, []), getStore(EVO_KEY, {})]).then(([contributions, evData]) => {
+      const dcaByAsset = {};
+      contributions.filter(c => c.month >= DCA_START).forEach(c => {
+        if (!dcaByAsset[c.assetName]) dcaByAsset[c.assetName] = { months: {}, participations: {} };
+        const a = dcaByAsset[c.assetName];
+        a.months[c.month] = (a.months[c.month] || 0) + c.amount;
+        a.participations[c.month] = (a.participations[c.month] || 0) + (c.participations || 0);
       });
-      total += totalN * (latestPrice ?? 0);
+      const allMonths = [...new Set(contributions.filter(c => c.month >= DCA_START).map(c => c.month))].sort();
+      let total = 0;
+      Object.keys(dcaByAsset).forEach(name => {
+        let totalN = 0, latestPrice = null;
+        allMonths.forEach(m => {
+          totalN += dcaByAsset[name]?.participations?.[m] || 0;
+          const ev = evData[`${name}___${m}`];
+          let price = null;
+          if (ev?.priceIsManual && ev.priceSource !== 'refresh' && ev.price != null) price = ev.price;
+          else {
+            const n = dcaByAsset[name]?.participations?.[m] || 0;
+            const amt = dcaByAsset[name]?.months?.[m];
+            if (n > 0 && amt != null) price = amt / n;
+            else if (ev?.price != null) price = ev.price;
+          }
+          if (price != null) latestPrice = price;
+        });
+        total += totalN * (latestPrice ?? 0);
+      });
+      setCurrentInvestments(total);
+      const months = contributions.filter(c => c.month >= DCA_START).map(c => c.month).sort();
+      setLatestInvMonth(months[months.length - 1] ?? null);
     });
-    return total;
-  }, []);
-
-  const latestInvMonth = useMemo(() => {
-    const contributions = loadJson(DCA_KEY, []);
-    const months = contributions.filter(c => c.month >= DCA_START).map(c => c.month).sort();
-    return months[months.length - 1] ?? null;
   }, []);
 
   // ── Derived salary ────────────────────────────────────────────────────────

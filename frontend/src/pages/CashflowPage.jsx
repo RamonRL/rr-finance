@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useStore } from '../hooks/useStore';
 import { NavLink, Routes, Route, Navigate } from 'react-router-dom';
 import {
   ComposedChart, BarChart, Bar, Line,
@@ -32,8 +33,6 @@ const CLR = {
 };
 
 // ── Storage ───────────────────────────────────────────────────────────────────
-const loadJson = (k, fb) => { try { return JSON.parse(localStorage.getItem(k)) ?? fb; } catch { return fb; } };
-const saveJson  = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const fmtEur = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
@@ -143,7 +142,7 @@ const ChartTooltip = ({ active, payload, label }) => {
 
 // ── Main component ────────────────────────────────────────────────────────────
 function MonthlyPage() {
-  const [cashflow, setCashflow]         = useState(() => loadJson(CASHFLOW_KEY, {}));
+  const [cashflow, setCashflow]         = useStore(CASHFLOW_KEY, {});
   const [apiMonths, setApiMonths]       = useState([]);
   const [selMonth, setSelMonth]         = useState('');
   const [parsing, setParsing]           = useState(false);
@@ -152,7 +151,7 @@ function MonthlyPage() {
   const [editVal, setEditVal]           = useState('');
   const escRef = useRef(false);
 
-  const persist = useCallback((next) => { setCashflow(next); saveJson(CASHFLOW_KEY, next); }, []);
+  const persist = useCallback((next) => { setCashflow(next); }, [setCashflow]);
 
   // Fetch available months from Personal account
   useEffect(() => {
