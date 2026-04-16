@@ -225,8 +225,10 @@ export default function EvolutionPage() {
 
   const assetNames = useMemo(() => Object.keys(dcaByAsset), [dcaByAsset]);
 
+  const ALL_ASSETS = '__all__';
+
   useEffect(() => {
-    if (!selectedAsset && assetNames.length > 0) setSelectedAsset(assetNames[0]);
+    if (!selectedAsset && assetNames.length > 0) setSelectedAsset(ALL_ASSETS);
   }, [assetNames, selectedAsset]);
 
   // Resolve price for a given asset + month.
@@ -416,9 +418,37 @@ export default function EvolutionPage() {
     return t;
   }, [allMonths, assetNames, evData]);
 
-  // Chart data for selected asset
+  // Chart data for selected asset (or all assets aggregated)
   const chartData = useMemo(() => {
-    if (!selectedAsset || !dcaByAsset[selectedAsset]) return [];
+    if (!selectedAsset) return [];
+
+    if (selectedAsset === ALL_ASSETS) {
+      // Per-asset state: cumulative N and last known price
+      const cumNByAsset = {};
+      const lastPriceByAsset = {};
+      assetNames.forEach(name => { cumNByAsset[name] = 0; lastPriceByAsset[name] = null; });
+
+      let cumContributed = 0;
+      return allMonths.map((m) => {
+        assetNames.forEach(name => {
+          cumNByAsset[name] += dcaByAsset[name]?.participations?.[m] || 0;
+          const { value: p } = getPrice(name, m);
+          if (p != null) lastPriceByAsset[name] = p;
+        });
+        cumContributed += assetNames.reduce((s, name) => s + (dcaByAsset[name]?.months[m] || 0), 0);
+        // For current price: use ___current override if set, else last month price
+        const value = assetNames.reduce((s, name) => {
+          const currentOverride = evData[`${name}___current`]?.price;
+          const price = currentOverride != null ? currentOverride : (lastPriceByAsset[name] ?? 0);
+          return s + cumNByAsset[name] * price;
+        }, 0);
+        const pnlEur = value - cumContributed;
+        const pnlPct = cumContributed > 0 ? (pnlEur / cumContributed) * 100 : 0;
+        return { label: fmtMonth(m), contributed: cumContributed, value, pnlEur, pnlPct };
+      });
+    }
+
+    if (!dcaByAsset[selectedAsset]) return [];
     let cumContributed = 0;
     let cumN = 0;
     let lastPrice = null;
@@ -428,12 +458,15 @@ export default function EvolutionPage() {
       cumN += dcaByAsset[selectedAsset].participations?.[m] || 0;
       const { value: p } = getPrice(selectedAsset, m);
       if (p != null) lastPrice = p;
-      const value = cumN * (lastPrice ?? 0);
+      // Use ___current override for the latest value
+      const currentOverride = evData[`${selectedAsset}___current`]?.price;
+      const priceToUse = currentOverride != null ? currentOverride : (lastPrice ?? 0);
+      const value = cumN * priceToUse;
       const pnlEur = value - cumContributed;
       const pnlPct = cumContributed > 0 ? (pnlEur / cumContributed) * 100 : 0;
       return { label: fmtMonth(m), contributed: cumContributed, value, pnlEur, pnlPct };
     });
-  }, [selectedAsset, dcaByAsset, allMonths, evData, getPrice]);
+  }, [selectedAsset, dcaByAsset, assetNames, allMonths, evData, getPrice]);
 
   const inputCls = 'w-full bg-background/60 border border-white/10 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-primary/60 tabular-nums';
 
@@ -496,11 +529,12 @@ export default function EvolutionPage() {
             <label className="text-xs text-secondary">Asset</label>
             <select value={selectedAsset} onChange={(e) => setSelectedAsset(e.target.value)}
               className="bg-elevated border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary">
+              <option value={ALL_ASSETS}>All Assets</option>
               {assetNames.map((name) => <option key={name} value={name}>{name}</option>)}
             </select>
           </div>
 
-          {selectedAsset && (() => {
+          {selectedAsset && selectedAsset !== ALL_ASSETS && (() => {
             const row = assetRows.find((r) => r.name === selectedAsset);
             if (!row) return null;
             const typeColor = TYPE_COLORS[row.meta.type] || TYPE_COLORS.Other;
