@@ -423,7 +423,6 @@ export default function EvolutionPage() {
     if (!selectedAsset) return [];
 
     if (selectedAsset === ALL_ASSETS) {
-      // Per-asset state: cumulative N and last known price
       const cumNByAsset = {};
       const lastPriceByAsset = {};
       assetNames.forEach(name => { cumNByAsset[name] = 0; lastPriceByAsset[name] = null; });
@@ -436,12 +435,8 @@ export default function EvolutionPage() {
           if (p != null) lastPriceByAsset[name] = p;
         });
         cumContributed += assetNames.reduce((s, name) => s + (dcaByAsset[name]?.months[m] || 0), 0);
-        // For current price: use ___current override if set, else last month price
-        const value = assetNames.reduce((s, name) => {
-          const currentOverride = evData[`${name}___current`]?.price;
-          const price = currentOverride != null ? currentOverride : (lastPriceByAsset[name] ?? 0);
-          return s + cumNByAsset[name] * price;
-        }, 0);
+        const value = assetNames.reduce((s, name) =>
+          s + cumNByAsset[name] * (lastPriceByAsset[name] ?? 0), 0);
         const pnlEur = value - cumContributed;
         const pnlPct = cumContributed > 0 ? (pnlEur / cumContributed) * 100 : 0;
         return { label: fmtMonth(m), contributed: cumContributed, value, pnlEur, pnlPct };
@@ -458,10 +453,7 @@ export default function EvolutionPage() {
       cumN += dcaByAsset[selectedAsset].participations?.[m] || 0;
       const { value: p } = getPrice(selectedAsset, m);
       if (p != null) lastPrice = p;
-      // Use ___current override for the latest value
-      const currentOverride = evData[`${selectedAsset}___current`]?.price;
-      const priceToUse = currentOverride != null ? currentOverride : (lastPrice ?? 0);
-      const value = cumN * priceToUse;
+      const value = cumN * (lastPrice ?? 0);
       const pnlEur = value - cumContributed;
       const pnlPct = cumContributed > 0 ? (pnlEur / cumContributed) * 100 : 0;
       return { label: fmtMonth(m), contributed: cumContributed, value, pnlEur, pnlPct };
