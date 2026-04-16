@@ -88,16 +88,18 @@ export default function DistributionPage() {
     const map = {};
     assetNames.forEach(name => {
       let totalN = 0;
-      let latestPrice = null;
+      let lastMonthPrice = null;
       allMonths.forEach(m => {
         totalN += dcaByAsset[name]?.participations?.[m] || 0;
         const p = getPrice(name, m);
-        if (p != null) latestPrice = p;
+        if (p != null) lastMonthPrice = p;
       });
+      const currentOverride = evData[`${name}___current`]?.price;
+      const latestPrice = currentOverride != null ? currentOverride : lastMonthPrice;
       map[name] = { totalN, latestPrice, totalEur: totalN * (latestPrice ?? 0) };
     });
     return map;
-  }, [assetNames, dcaByAsset, allMonths, getPrice]);
+  }, [assetNames, dcaByAsset, allMonths, evData, getPrice]);
 
   const grandTotalEur = useMemo(() =>
     assetNames.reduce((s, a) => s + (assetValueMap[a]?.totalEur || 0), 0),
