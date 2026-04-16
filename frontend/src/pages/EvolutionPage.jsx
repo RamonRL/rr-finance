@@ -521,7 +521,7 @@ export default function EvolutionPage() {
             <label className="text-xs text-secondary">Asset</label>
             <select value={selectedAsset} onChange={(e) => setSelectedAsset(e.target.value)}
               className="bg-elevated border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary">
-              <option value={ALL_ASSETS}>All Assets — Performance over time</option>
+              <option value={ALL_ASSETS}>All Assets</option>
               {assetNames.map((name) => <option key={name} value={name}>{name}</option>)}
             </select>
           </div>
@@ -939,7 +939,7 @@ export default function EvolutionPage() {
         {selectedAsset && chartData.length > 0 && (
           <div className="space-y-4">
             <p className="text-[11px] font-semibold text-secondary uppercase tracking-widest">
-              {selectedAsset} — performance over time
+              {selectedAsset === ALL_ASSETS ? 'All Assets' : selectedAsset} — performance over time
             </p>
 
             {/* Chart 1: Contributed vs Value */}
