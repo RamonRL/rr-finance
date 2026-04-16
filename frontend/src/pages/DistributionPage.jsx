@@ -94,8 +94,9 @@ export default function DistributionPage() {
         const p = getPrice(name, m);
         if (p != null) lastMonthPrice = p;
       });
-      const currentOverride = evData[`${name}___current`]?.price;
-      const latestPrice = currentOverride != null ? currentOverride : lastMonthPrice;
+      // ___current key takes priority over per-month derived price
+      const currentOverride = evData[`${name}___current`]?.price ?? null;
+      const latestPrice = currentOverride !== null ? currentOverride : lastMonthPrice;
       map[name] = { totalN, latestPrice, totalEur: totalN * (latestPrice ?? 0) };
     });
     return map;
@@ -241,10 +242,8 @@ export default function DistributionPage() {
     setSimPrices(prev => {
       const next = { ...prev };
       assetNames.forEach(a => {
-        if (!next[a]) {
-          const p = assetValueMap[a]?.latestPrice;
-          if (p != null) next[a] = p.toFixed(4);
-        }
+        const p = assetValueMap[a]?.latestPrice;
+        if (p != null) next[a] = p.toFixed(4);
       });
       return next;
     });

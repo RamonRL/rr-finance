@@ -233,12 +233,14 @@ export default function EvolutionPage() {
   // User-typed manual prices (priceSource !== 'refresh') take priority and show the ✎ indicator.
   // Refresh-written prices (priceSource === 'refresh') are treated as non-manual for display purposes.
   const getPrice = useCallback((assetName, month) => {
+    const n = dcaByAsset[assetName]?.participations?.[month] || 0;
+    const dcaAmt = dcaByAsset[assetName]?.months[month];
+    // Participation months always use the DCA buy price — no overrides
+    if (n > 0 && dcaAmt != null) return { value: dcaAmt / n, isManual: false };
+    // No-participation months: manual input takes priority
     const ev = evData[`${assetName}___${month}`];
     if (ev?.priceIsManual && ev.priceSource !== 'refresh' && ev.price != null)
       return { value: ev.price, isManual: true };
-    const n = dcaByAsset[assetName]?.participations?.[month] || 0;
-    const dcaAmt = dcaByAsset[assetName]?.months[month];
-    if (n > 0 && dcaAmt != null) return { value: dcaAmt / n, isManual: false };
     if (ev?.price != null) return { value: ev.price, isManual: false };
     return { value: null, isManual: false };
   }, [evData, dcaByAsset]);
@@ -255,6 +257,20 @@ export default function EvolutionPage() {
     const p = rawValue === '' ? null : parseFloat(rawValue);
     persistEv({ ...evData, [key]: { price: isNaN(p) ? null : p } });
   }, [evData, persistEv]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // One-time cleanup: remove any ___month keys that were written by Refresh prices
+  const cleanedRefreshRef = React.useRef(false);
+  useEffect(() => {
+    if (cleanedRefreshRef.current || Object.keys(evData).length === 0) return;
+    const stale = Object.keys(evData).filter(
+      k => !k.endsWith('___current') && evData[k]?.priceSource === 'refresh'
+    );
+    cleanedRefreshRef.current = true;
+    if (stale.length === 0) return;
+    const cleaned = { ...evData };
+    stale.forEach(k => delete cleaned[k]);
+    persistEv(cleaned);
+  }, [evData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [apiKeys, persistApiKeys] = useStore('rr_finance_api_keys', { fmp: '' });
   const [showKeyConfig, setShowKeyConfig] = useState(false);
@@ -286,16 +302,9 @@ export default function EvolutionPage() {
 
     await Promise.all(assetNames.map(async (name) => {
       const meta = dcaByAsset[name];
-      const evKey = `${name}___${latestMonth}`;
-      const existing = evData[evKey];
 
       if (!meta?.ticker) {
         items.push({ name, status: 'skipped', reason: 'no ticker' });
-        return;
-      }
-      // Skip user-typed manual prices; allow overwriting refresh-written ones
-      if (existing?.priceIsManual && existing.priceSource !== 'refresh') {
-        items.push({ name, status: 'skipped', reason: 'manual override' });
         return;
       }
 
@@ -309,7 +318,6 @@ export default function EvolutionPage() {
         if (isCrypto) {
           const price = await fetchCoinGeckoPrice(meta.ticker);
           if (price != null) {
-            newPrices[evKey] = { price, priceIsManual: true, priceSource: 'refresh' };
             newPrices[`${name}___current`] = { price };
             items.push({ name, status: 'updated', price, currency: 'EUR' });
           } else {
@@ -322,7 +330,6 @@ export default function EvolutionPage() {
           } else if (result.price == null) {
             items.push({ name, status: 'unavailable', reason: result.reason || 'no price' });
           } else {
-            newPrices[evKey] = { price: result.price, priceIsManual: true, priceSource: 'refresh' };
             newPrices[`${name}___current`] = { price: result.price };
             items.push({ name, status: 'updated', price: result.price, currency: result.currency });
           }
