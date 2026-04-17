@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import TransactionsPage from './pages/TransactionsPage';
@@ -6,6 +7,7 @@ import SavingsPage from './pages/SavingsPage';
 import InvestmentsPage from './pages/InvestmentsPage';
 import AdminPage from './pages/AdminPage';
 import CashflowPage from './pages/CashflowPage';
+import LoginPage from './pages/LoginPage';
 import AnimatedBackground from './AnimatedBackground';
 import { AccountProvider, useAccount } from './AccountContext';
 
@@ -17,6 +19,23 @@ const NAV_LINKS = [
   { to: '/cashflow', label: 'Cashflow' },
   { to: '/analytics', label: 'Analytics' },
 ];
+
+function LogoutButton({ onLogout }) {
+  return (
+    <button
+      onClick={onLogout}
+      title="Sign out"
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-white/10 text-secondary hover:text-white hover:border-white/20 transition-colors"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      <span>Logout</span>
+    </button>
+  );
+}
 
 function StreamerButton() {
   const { streamerMode, toggleStreamerMode } = useAccount();
@@ -37,7 +56,7 @@ function StreamerButton() {
 }
 
 
-function Layout({ children }) {
+function Layout({ children, onLogout }) {
   const location = useLocation();
   const { streamerMode } = useAccount();
 
@@ -60,6 +79,7 @@ function Layout({ children }) {
             {/* Actions visible on mobile only (top-right) */}
             <div className="flex items-center gap-2 md:hidden">
               <StreamerButton />
+              <LogoutButton onLogout={onLogout} />
               <Link
                 to="/admin"
                 title="Admin settings"
@@ -99,6 +119,7 @@ function Layout({ children }) {
           {/* Actions on desktop only */}
           <div className="hidden md:flex items-center justify-end gap-2">
             <StreamerButton />
+            <LogoutButton onLogout={onLogout} />
             <Link
               to="/admin"
               title="Admin settings"
@@ -130,9 +151,9 @@ function Layout({ children }) {
   );
 }
 
-function AppContent() {
+function AppContent({ onLogout }) {
   return (
-    <Layout>
+    <Layout onLogout={onLogout}>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
@@ -147,11 +168,33 @@ function AppContent() {
 }
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => Boolean(localStorage.getItem('authToken'))
+  );
+
+  useEffect(() => {
+    const handler = () => setIsAuthenticated(false);
+    window.addEventListener('auth:logout', handler);
+    return () => window.removeEventListener('auth:logout', handler);
+  }, []);
+
+  function handleLogin() {
+    setIsAuthenticated(true);
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('authToken');
+    setIsAuthenticated(false);
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
 
   return (
     <Router>
       <AccountProvider>
-        <AppContent />
+        <AppContent onLogout={handleLogout} />
       </AccountProvider>
     </Router>
   );

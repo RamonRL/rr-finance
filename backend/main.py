@@ -1,21 +1,54 @@
 import os
 import json
+import secrets
 import contextlib
 from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Any, Optional
 from collections import defaultdict
 
+import jwt
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.pool import NullPool
 from sqlmodel import Field, Session, SQLModel, create_engine, select
+from starlette.middleware.base import BaseHTTPMiddleware
 from dateutil.relativedelta import relativedelta
 
 load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Auth config
+# ---------------------------------------------------------------------------
+
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-production")
+APP_USERNAME = os.getenv("APP_USERNAME")
+APP_PASSWORD = os.getenv("APP_PASSWORD")
+
+_UNPROTECTED_PATHS = {"/login", "/health"}
+
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path in _UNPROTECTED_PATHS:
+            return await call_next(request)
+
+        auth = request.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+
+        token = auth.split(" ", 1)[1]
+        try:
+            jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        except jwt.PyJWTError:
+            return JSONResponse({"detail": "Invalid or expired token"}, status_code=401)
+
+        return await call_next(request)
+
 
 # ---------------------------------------------------------------------------
 # Database setup
@@ -210,6 +243,7 @@ origins = [
     "http://localhost:3000",
 ]
 
+app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -226,6 +260,25 @@ app.add_middleware(
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "rr-finance"}
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/login")
+def login(data: LoginRequest):
+    if not APP_USERNAME or not APP_PASSWORD:
+        raise HTTPException(status_code=503, detail="Authentication not configured (APP_USERNAME/APP_PASSWORD not set)")
+    valid = (
+        secrets.compare_digest(data.username, APP_USERNAME)
+        and secrets.compare_digest(data.password, APP_PASSWORD)
+    )
+    if not valid:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = jwt.encode({"sub": data.username}, SECRET_KEY, algorithm="HS256")
+    return {"token": token}
 
 
 @app.get("/categories")
