@@ -44,6 +44,7 @@ export default function TransactionsPage() {
   const [filterCategory, setFilterCategory] = useState('');
   const [search, setSearch] = useState('');
   const [showTransferForm, setShowTransferForm] = useState(false);
+  const [mobileFormOpen, setMobileFormOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
 
@@ -142,6 +143,8 @@ export default function TransactionsPage() {
     setForm({ date: tx.date, description: tx.description, amount: String(tx.amount), type: tx.type, category: tx.category, notes: tx.notes || '' });
     setEditId(tx.id);
     setShowTransferForm(false);
+    setMobileFormOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id) => {
@@ -174,13 +177,25 @@ export default function TransactionsPage() {
   const accountColor = (id) => accounts.find(a => a.id === id)?.color ?? '#7a95b2';
 
   return (
-    <div className="flex gap-5 h-full overflow-hidden p-6">
+    <div className="flex flex-col md:flex-row gap-3 md:gap-5 md:h-full md:overflow-hidden p-3 md:p-6 overflow-y-auto">
 
       {/* LEFT COLUMN — form */}
-      <div className="w-72 flex-shrink-0 overflow-y-auto custom-scrollbar space-y-4 pb-4">
-        <h2 className="text-xl font-bold text-white">{editId ? 'Edit transaction' : 'New transaction'}</h2>
+      <div className="w-full md:w-72 md:flex-shrink-0 md:overflow-y-auto md:custom-scrollbar space-y-3 md:space-y-4 md:pb-4">
+        {/* Mobile toggle button — hidden on desktop */}
+        <button
+          onClick={() => setMobileFormOpen(o => !o)}
+          className="md:hidden w-full flex items-center justify-between px-4 py-3 bg-surface border border-white/10 rounded-xl text-sm font-semibold text-white hover:border-accent-green/40 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-accent-green text-base leading-none">{mobileFormOpen ? '×' : '+'}</span>
+            {editId ? 'Edit transaction' : 'New transaction'}
+          </span>
+          <span className="text-xs text-muted">{mobileFormOpen ? 'Close' : 'Tap to open'}</span>
+        </button>
 
-        <div className="bg-surface border border-white/10 rounded-xl p-5">
+        <h2 className="hidden md:block text-xl font-bold text-white">{editId ? 'Edit transaction' : 'New transaction'}</h2>
+
+        <div className={`${mobileFormOpen ? 'block' : 'hidden'} md:block bg-surface border border-white/10 rounded-xl p-4 md:p-5`}>
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <label className={labelCls}>Date</label>
@@ -230,13 +245,13 @@ export default function TransactionsPage() {
         </div>
 
         {/* Transfer */}
-        <div className="space-y-3">
+        <div className={`${mobileFormOpen ? 'block' : 'hidden'} md:block space-y-3`}>
           <button onClick={() => setShowTransferForm(p => !p)}
             className="w-full bg-accent-gold/20 hover:bg-accent-gold/30 text-accent-gold text-sm font-semibold px-4 py-2 rounded-lg transition-colors border border-accent-gold/30">
             ⇄ {showTransferForm ? 'Cancel transfer' : 'New transfer'}
           </button>
           {showTransferForm && (
-            <div className="bg-surface border border-accent-gold/20 rounded-xl p-5">
+            <div className="bg-surface border border-accent-gold/20 rounded-xl p-4 md:p-5">
               <form onSubmit={handleTransferSubmit} className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
                   <label className={labelCls}>Date</label>
@@ -283,16 +298,16 @@ export default function TransactionsPage() {
       </div>
 
       {/* RIGHT COLUMN — history */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col md:overflow-hidden min-w-0">
         {/* Static header + filters */}
-        <div className="flex-shrink-0 space-y-4 pb-4">
+        <div className="md:flex-shrink-0 space-y-3 md:space-y-4 md:pb-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">History</h2>
-            <span className="text-sm text-secondary">{unified.length} transactions</span>
+            <h2 className="text-lg md:text-xl font-bold text-white">History</h2>
+            <span className="text-xs md:text-sm text-secondary">{unified.length} transactions</span>
           </div>
 
           {/* Filters */}
-          <div className="bg-surface border border-white/10 rounded-xl p-4 flex flex-wrap gap-3 items-center">
+          <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-4 grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3 md:items-center">
             <select value={filterYM} onChange={e => setFilterYM(e.target.value)}
               className="bg-elevated border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/50">
               <option value="">All time</option>
@@ -312,26 +327,26 @@ export default function TransactionsPage() {
               {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)}
-              className="bg-elevated border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-muted focus:outline-none focus:border-primary/50 flex-1 min-w-[120px]" />
+              className="bg-elevated border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-muted focus:outline-none focus:border-primary/50 col-span-2 md:flex-1 md:min-w-[120px]" />
           </div>
         </div>
 
         {/* Scrollable table + pagination */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pb-4">
+        <div className="md:flex-1 md:overflow-y-auto md:custom-scrollbar space-y-4 md:pb-4">
 
         {/* Table */}
-        <div className="bg-surface border border-white/10 rounded-xl">
+        <div className="bg-surface border border-white/10 rounded-xl overflow-hidden">
           {unified.length === 0 ? (
             <div className="p-10 text-center text-muted">No transactions found.</div>
           ) : (
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10 bg-surface">
-                <tr className="border-b border-white/[0.06] text-xs text-secondary uppercase tracking-widest">
-                  <th className="px-4 py-3 text-left rounded-tl-xl">Date</th>
-                  <th className="px-4 py-3 text-left">Description</th>
-                  <th className="px-4 py-3 text-left">Category</th>
-                  <th className="px-4 py-3 text-right">Amount</th>
-                  <th className="px-4 py-3 text-right rounded-tr-xl">Actions</th>
+                <tr className="border-b border-white/[0.06] text-[10px] md:text-xs text-secondary uppercase tracking-widest">
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-left">Date</th>
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-left">Description</th>
+                  <th className="hidden md:table-cell px-4 py-3 text-left">Category</th>
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-right">Amount</th>
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-right w-10 md:w-auto"></th>
                 </tr>
               </thead>
               <tbody>
@@ -341,48 +356,63 @@ export default function TransactionsPage() {
                     const otherId = isOut ? row.to_account_id : row.from_account_id;
                     return (
                       <tr key={`tr-${row.id}`} className="border-b border-white/[0.06] hover:bg-white/[0.06] transition-colors">
-                        <td className="px-4 py-3 text-secondary">{row.date}</td>
-                        <td className="px-4 py-3">
-                          <span className="text-accent-gold font-medium">⇄ Transfer</span>
-                          <span className="ml-2 text-xs text-secondary">
-                            {isOut ? '→' : '←'}{' '}
-                            <span style={{ color: accountColor(otherId) }}>{accountName(otherId)}</span>
-                          </span>
-                          {row.notes && <span className="ml-2 text-xs text-muted">({row.notes})</span>}
+                        <td className="px-2 md:px-4 py-2 md:py-3 text-secondary text-xs md:text-sm whitespace-nowrap">{row.date}</td>
+                        <td className="px-2 md:px-4 py-2 md:py-3 min-w-0">
+                          <div className="flex flex-col md:flex-row md:items-center md:gap-2 min-w-0">
+                            <span className="text-accent-gold font-medium text-xs md:text-sm truncate">⇄ Transfer</span>
+                            <span className="text-[10px] md:text-xs text-secondary truncate">
+                              {isOut ? '→' : '←'}{' '}
+                              <span style={{ color: accountColor(otherId) }}>{accountName(otherId)}</span>
+                            </span>
+                          </div>
+                          {row.notes && <div className="text-[10px] md:text-xs text-muted truncate">({row.notes})</div>}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="hidden md:table-cell px-4 py-3">
                           <span className="text-xs px-2 py-1 rounded bg-accent-gold/10 text-accent-gold/70">Transfer</span>
                         </td>
-                        <td className={`px-4 py-3 text-right font-semibold tabular-nums ${isOut ? 'text-accent-gold' : 'text-accent-gold'}`}>
+                        <td className={`px-2 md:px-4 py-2 md:py-3 text-right font-semibold tabular-nums text-xs md:text-sm whitespace-nowrap ${isOut ? 'text-accent-gold' : 'text-accent-gold'}`}>
                           <span className="private">{isOut ? '-' : '+'}{fmt(row.amount)}</span>
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-2 md:px-4 py-2 md:py-3 text-right">
                           <button onClick={() => handleDeleteTransfer(row.id)}
-                            className="text-xs text-accent-red/60 hover:text-accent-red transition-colors">Delete</button>
+                            aria-label="Delete"
+                            className="text-accent-red/60 hover:text-accent-red transition-colors text-lg md:text-xs leading-none">
+                            <span className="md:hidden">×</span>
+                            <span className="hidden md:inline">Delete</span>
+                          </button>
                         </td>
                       </tr>
                     );
                   }
                   return (
                     <tr key={`tx-${row.id}`} className="border-b border-white/[0.06] hover:bg-white/[0.06] transition-colors">
-                      <td className="px-4 py-3 text-secondary">{row.date}</td>
-                      <td className="px-4 py-3 text-white">
-                        {row.description}
-                        {row.notes && <span className="ml-2 text-xs text-muted">({row.notes})</span>}
+                      <td className="px-2 md:px-4 py-2 md:py-3 text-secondary text-xs md:text-sm whitespace-nowrap">{row.date}</td>
+                      <td className="px-2 md:px-4 py-2 md:py-3 text-white min-w-0">
+                        <div className="truncate text-xs md:text-sm">{row.description}</div>
+                        <div className="md:hidden text-[10px] text-muted truncate">{row.category}{row.notes ? ` · ${row.notes}` : ''}</div>
+                        {row.notes && <span className="hidden md:inline ml-2 text-xs text-muted">({row.notes})</span>}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="hidden md:table-cell px-4 py-3">
                         <span className="text-xs px-2 py-1 rounded bg-white/[0.06] text-secondary">{row.category}</span>
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                      <td className="px-2 md:px-4 py-2 md:py-3 text-right font-semibold tabular-nums text-xs md:text-sm whitespace-nowrap">
                         <span className="private" style={{ color: row.type === 'income' ? '#00c896' : '#ff5c5c' }}>
                           {row.type === 'income' ? '+' : '-'}{fmt(row.amount)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-2 md:px-4 py-2 md:py-3 text-right whitespace-nowrap">
                         <button onClick={() => handleEdit(row)}
-                          className="text-xs text-secondary hover:text-white mr-3 transition-colors">Edit</button>
+                          aria-label="Edit"
+                          className="text-secondary hover:text-white mr-2 md:mr-3 transition-colors text-lg md:text-xs leading-none">
+                          <span className="md:hidden">✎</span>
+                          <span className="hidden md:inline">Edit</span>
+                        </button>
                         <button onClick={() => handleDelete(row.id)}
-                          className="text-xs text-accent-red/60 hover:text-accent-red transition-colors">Delete</button>
+                          aria-label="Delete"
+                          className="text-accent-red/60 hover:text-accent-red transition-colors text-lg md:text-xs leading-none">
+                          <span className="md:hidden">×</span>
+                          <span className="hidden md:inline">Delete</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -395,21 +425,21 @@ export default function TransactionsPage() {
         </div>
 
         {/* Pagination — static footer */}
-        <div className="flex-shrink-0 pt-3 flex items-center justify-between text-sm text-secondary">
+        <div className="md:flex-shrink-0 pt-3 flex items-center justify-between text-xs md:text-sm text-secondary">
           <select
             value={pageSize}
             onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-            className="bg-elevated border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-primary/50"
+            className="bg-elevated border border-white/10 rounded-lg px-2 md:px-3 py-1.5 text-xs md:text-sm text-white focus:outline-none focus:border-primary/50"
           >
             {PAGE_SIZES.map(s => <option key={s} value={s}>{s} / page</option>)}
           </select>
           {totalPages > 1 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 md:gap-2">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="px-3 py-1 rounded-lg border border-white/10 hover:border-white/20 disabled:opacity-30 transition-colors">←</button>
+                className="px-2 md:px-3 py-1 rounded-lg border border-white/10 hover:border-white/20 disabled:opacity-30 transition-colors">←</button>
               <span>{page} / {totalPages}</span>
               <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="px-3 py-1 rounded-lg border border-white/10 hover:border-white/20 disabled:opacity-30 transition-colors">→</button>
+                className="px-2 md:px-3 py-1 rounded-lg border border-white/10 hover:border-white/20 disabled:opacity-30 transition-colors">→</button>
             </div>
           )}
         </div>

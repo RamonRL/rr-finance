@@ -153,13 +153,13 @@ export default function AnalyticsPage() {
   const balanceLine = monthly.map(m => ({ ...m, balance: m.income - m.expenses }));
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="h-full overflow-y-auto custom-scrollbar p-3 md:p-6">
+      <div className="max-w-6xl mx-auto space-y-4 md:space-y-6">
 
-        <h2 className="text-xl font-bold text-white">Analytics</h2>
+        <h2 className="text-lg md:text-xl font-bold text-white">Analytics</h2>
 
         {/* Income vs Expenses bar chart */}
-        <div className="bg-surface border border-white/10 rounded-xl p-5">
+        <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest">Income vs Expenses</h3>
             <select value={monthsRange} onChange={e => setMonthsRange(Number(e.target.value))}
@@ -184,7 +184,7 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Balance line chart */}
-        <div className="bg-surface border border-white/10 rounded-xl p-5">
+        <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
           <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">Balance evolution</h3>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={balanceLine}>
@@ -211,9 +211,9 @@ export default function AnalyticsPage() {
           const pieTotal = slices.reduce((s, d) => s + d.value, 0);
 
           return (
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
-              <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">Account balance history</h3>
-              <div className="flex gap-6">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
+              <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-3 md:mb-4">Account balance history</h3>
+              <div className="flex flex-col md:flex-row gap-4 md:gap-6">
                 <div className="flex-1 min-w-0">
                   <ResponsiveContainer width="100%" height={220}>
                     <LineChart data={enrichedHistory}>
@@ -238,7 +238,7 @@ export default function AnalyticsPage() {
 
                 {/* Balance distribution pie */}
                 {slices.length > 0 && (
-                  <div className="w-44 flex-shrink-0 flex flex-col justify-center gap-4">
+                  <div className="w-full md:w-44 md:flex-shrink-0 flex flex-col justify-center gap-4">
                     <ResponsiveContainer width="100%" height={140}>
                       <PieChart>
                         <Pie data={slices} dataKey="value" nameKey="name"
@@ -267,7 +267,7 @@ export default function AnalyticsPage() {
         })()}
 
         {/* Category analysis */}
-        <div className="bg-surface border border-white/10 rounded-xl p-5">
+        <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest">Category analysis</h3>
             <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
@@ -275,7 +275,7 @@ export default function AnalyticsPage() {
               {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <div>
               <p className="text-xs text-muted uppercase tracking-widest mb-3">Income vs Expenses</p>
               <ResponsiveContainer width="100%" height={200}>
@@ -306,8 +306,8 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Category breakdown */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-surface border border-white/10 rounded-xl p-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+          <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest">Expenses by category</h3>
               <select value={selectedYM} onChange={e => setSelectedYM(e.target.value)}
@@ -332,7 +332,7 @@ export default function AnalyticsPage() {
             )}
           </div>
 
-          <div className="bg-surface border border-white/10 rounded-xl p-5">
+          <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
             <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">Category breakdown</h3>
             {pieData.length ? (
               <ul className="space-y-3 overflow-y-auto custom-scrollbar" style={{ maxHeight: 260 }}>

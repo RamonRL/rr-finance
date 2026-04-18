@@ -30,14 +30,14 @@ const TYPE_COLORS = {
 function KpiCard({ label, value, color, icon, valueColor }) {
   const stripe = color.includes('green') ? 'var(--accent-green)' : color.includes('red') ? 'var(--accent-red)' : 'var(--accent-blue)';
   return (
-    <div className="bg-surface rounded-xl p-5 flex items-center gap-4"
+    <div className="bg-surface rounded-xl p-3 md:p-5 flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4 min-w-0"
       style={{ borderTop: '1px solid var(--border-default)', borderLeft: `2px solid ${stripe}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
-      <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl ${color}`}>
+      <div className={`w-8 h-8 md:w-12 md:h-12 rounded-lg flex items-center justify-center text-base md:text-2xl ${color}`}>
         {icon}
       </div>
-      <div>
-        <p className="text-[11px] text-secondary uppercase tracking-[0.08em]">{label}</p>
-        <p className={`text-2xl font-bold tabular-nums ${valueColor ?? (value >= 0 ? 'text-white' : 'text-accent-red')}`}>
+      <div className="min-w-0 w-full">
+        <p className="text-[10px] md:text-[11px] text-secondary uppercase tracking-[0.08em] truncate">{label}</p>
+        <p className={`text-base md:text-2xl font-bold tabular-nums truncate ${valueColor ?? (value >= 0 ? 'text-white' : 'text-accent-red')}`}>
           <span className="private">{fmtEur(value)}</span>
         </p>
       </div>
@@ -173,16 +173,16 @@ const HomePage = () => {
   const grandTotal = totalBankBalance + grandTotalEur;
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="h-full overflow-y-auto custom-scrollbar p-3 md:p-6">
+      <div className="max-w-6xl mx-auto space-y-4 md:space-y-6">
 
         {/* Header row */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Dashboard</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg md:text-xl font-bold text-white">Dashboard</h2>
           <select
             value={selectedYM}
             onChange={e => setSelectedYM(e.target.value)}
-            className="bg-elevated border border-white/10 text-sm text-white rounded-lg px-3 py-2 focus:outline-none focus:border-primary/50"
+            className="bg-elevated border border-white/10 text-xs md:text-sm text-white rounded-lg px-2 md:px-3 py-1.5 md:py-2 focus:outline-none focus:border-primary/50"
           >
             {availableMonths.map(m => (
               <option key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`}>{m.label}</option>
@@ -191,7 +191,7 @@ const HomePage = () => {
         </div>
 
         {/* Monthly KPI cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-2 md:gap-4">
           <KpiCard label="Income"   value={summary?.income    ?? 0} color="bg-accent-green/20" icon="📈" valueColor="text-accent-green" />
           <KpiCard label="Expenses" value={summary?.expenses  ?? 0} color="bg-accent-red/20"   icon="📉" valueColor="text-accent-red" />
           <KpiCard label="Balance"  value={summary?.balance   ?? 0} color="bg-accent-blue/20"  icon="⚖️" />
@@ -199,17 +199,17 @@ const HomePage = () => {
 
         {/* Account balances — bank accounts + portfolio card */}
         {(balances.length > 0 || hasPortfolio) && (
-          <div className="bg-surface border border-white/10 rounded-xl p-5">
-            <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">Account balances</h3>
-            <div className="flex flex-wrap gap-3">
+          <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
+            <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-3 md:mb-4">Account balances</h3>
+            <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3">
               {/* Bank accounts */}
               {balances.map(acc => (
-                <div key={acc.id} className="flex-1 min-w-[140px] bg-background/50 rounded-lg p-4 border border-white/[0.06]">
+                <div key={acc.id} className="min-w-0 md:flex-1 md:min-w-[140px] bg-background/50 rounded-lg p-3 md:p-4 border border-white/[0.06]">
                   <div className="flex items-center gap-2 mb-2">
                     <span>{acc.icon}</span>
                     <span className="text-xs text-secondary truncate">{acc.name}</span>
                   </div>
-                  <p className="text-xl font-bold tabular-nums" style={{ color: acc.balance >= 0 ? acc.color : '#ff5c5c' }}>
+                  <p className="text-base md:text-xl font-bold tabular-nums truncate" style={{ color: acc.balance >= 0 ? acc.color : '#ff5c5c' }}>
                     <span className="private">{fmtEur(acc.balance)}</span>
                   </p>
                 </div>
@@ -217,13 +217,13 @@ const HomePage = () => {
 
               {/* Portfolio card */}
               {hasPortfolio && (
-                <div className="flex-1 min-w-[140px] bg-background/50 rounded-lg p-4 border border-white/[0.06]"
+                <div className="min-w-0 md:flex-1 md:min-w-[140px] bg-background/50 rounded-lg p-3 md:p-4 border border-white/[0.06]"
                   style={{ borderLeft: '2px solid #6366f1' }}>
                   <div className="flex items-center gap-2 mb-2">
                     <span>📊</span>
                     <span className="text-xs text-secondary">Portfolio</span>
                   </div>
-                  <p className="text-xl font-bold tabular-nums text-white">
+                  <p className="text-base md:text-xl font-bold tabular-nums text-white truncate">
                     <span className="private">{fmtEur(grandTotalEur)}</span>
                   </p>
                   {grandPnlEur !== 0 && (
@@ -235,12 +235,12 @@ const HomePage = () => {
               )}
 
               {/* Grand total */}
-              <div className="flex-1 min-w-[140px] bg-background/50 rounded-lg p-4 border border-white/[0.06]">
+              <div className="min-w-0 md:flex-1 md:min-w-[140px] bg-background/50 rounded-lg p-3 md:p-4 border border-white/[0.06] col-span-2 md:col-span-1">
                 <div className="flex items-center gap-2 mb-2">
                   <span>💰</span>
                   <span className="text-xs text-secondary">Total</span>
                 </div>
-                <p className={`text-xl font-bold tabular-nums ${grandTotal >= 0 ? 'text-white' : 'text-accent-red'}`}>
+                <p className={`text-base md:text-xl font-bold tabular-nums truncate ${grandTotal >= 0 ? 'text-white' : 'text-accent-red'}`}>
                   <span className="private">{fmtEur(grandTotal)}</span>
                 </p>
               </div>
@@ -250,33 +250,33 @@ const HomePage = () => {
 
         {/* Portfolio snapshot */}
         {hasPortfolio && (
-          <div className="bg-surface border border-white/10 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest">Portfolio</h3>
               <Link to="/investments" className="text-xs text-primary hover:text-accent transition-colors">View all →</Link>
             </div>
 
             {/* Summary stat cards */}
-            <div className="grid grid-cols-4 gap-3 mb-5">
-              <div className="bg-background/50 rounded-lg p-4 border border-white/[0.06]" style={{ borderLeft: '2px solid #3d9eff' }}>
-                <p className="text-[10px] text-secondary uppercase tracking-widest mb-1">Contributed</p>
-                <p className="text-lg font-bold text-white tabular-nums private">{fmtEur(grandContributed)}</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-4 md:mb-5">
+              <div className="bg-background/50 rounded-lg p-3 md:p-4 border border-white/[0.06] min-w-0" style={{ borderLeft: '2px solid #3d9eff' }}>
+                <p className="text-[10px] text-secondary uppercase tracking-widest mb-1 truncate">Contributed</p>
+                <p className="text-sm md:text-lg font-bold text-white tabular-nums private truncate">{fmtEur(grandContributed)}</p>
               </div>
-              <div className="bg-background/50 rounded-lg p-4 border border-white/[0.06]" style={{ borderLeft: '2px solid #6366f1' }}>
-                <p className="text-[10px] text-secondary uppercase tracking-widest mb-1">Portfolio value</p>
-                <p className="text-lg font-bold text-white tabular-nums private">{fmtEur(grandTotalEur)}</p>
+              <div className="bg-background/50 rounded-lg p-3 md:p-4 border border-white/[0.06] min-w-0" style={{ borderLeft: '2px solid #6366f1' }}>
+                <p className="text-[10px] text-secondary uppercase tracking-widest mb-1 truncate">Portfolio value</p>
+                <p className="text-sm md:text-lg font-bold text-white tabular-nums private truncate">{fmtEur(grandTotalEur)}</p>
               </div>
-              <div className="bg-background/50 rounded-lg p-4 border border-white/[0.06]"
+              <div className="bg-background/50 rounded-lg p-3 md:p-4 border border-white/[0.06] min-w-0"
                 style={{ borderLeft: `2px solid ${pnlColor(grandPnlEur)}` }}>
-                <p className="text-[10px] text-secondary uppercase tracking-widest mb-1">P&amp;L</p>
-                <p className="text-lg font-bold tabular-nums private" style={{ color: pnlColor(grandPnlEur) }}>
+                <p className="text-[10px] text-secondary uppercase tracking-widest mb-1 truncate">P&amp;L</p>
+                <p className="text-sm md:text-lg font-bold tabular-nums private truncate" style={{ color: pnlColor(grandPnlEur) }}>
                   {pnlSign(grandPnlEur)}{fmtEur(grandPnlEur)}
                 </p>
               </div>
-              <div className="bg-background/50 rounded-lg p-4 border border-white/[0.06]"
+              <div className="bg-background/50 rounded-lg p-3 md:p-4 border border-white/[0.06] min-w-0"
                 style={{ borderLeft: `2px solid ${pnlColor(grandPnlPct)}` }}>
-                <p className="text-[10px] text-secondary uppercase tracking-widest mb-1">Return</p>
-                <p className="text-lg font-bold tabular-nums" style={{ color: pnlColor(grandPnlPct) }}>
+                <p className="text-[10px] text-secondary uppercase tracking-widest mb-1 truncate">Return</p>
+                <p className="text-sm md:text-lg font-bold tabular-nums truncate" style={{ color: pnlColor(grandPnlPct) }}>
                   {grandPnlPct != null ? `${pnlSign(grandPnlPct)}${grandPnlPct.toFixed(2)}%` : '—'}
                 </p>
               </div>
@@ -288,25 +288,27 @@ const HomePage = () => {
                 const typeColor = TYPE_COLORS[r.meta.type] || TYPE_COLORS.Other;
                 const pct = grandTotalEur > 0 ? (r.totalEur / grandTotalEur) * 100 : 0;
                 return (
-                  <div key={r.name} className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 w-48 min-w-0 flex-shrink-0">
+                  <div key={r.name} className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3">
+                    <div className="flex items-center gap-2 md:w-48 min-w-0 md:flex-shrink-0">
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: typeColor }} />
                       <span className="text-sm text-white truncate">{r.name}</span>
                       <span className="text-[10px] px-1.5 py-px rounded flex-shrink-0"
                         style={{ background: typeColor + '22', color: typeColor }}>{r.meta.type}</span>
                     </div>
-                    <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full">
-                      <div className="h-1.5 rounded-full transition-all"
-                        style={{ width: `${pct}%`, backgroundColor: typeColor }} />
+                    <div className="flex items-center gap-2 md:contents">
+                      <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full min-w-0">
+                        <div className="h-1.5 rounded-full transition-all"
+                          style={{ width: `${pct}%`, backgroundColor: typeColor }} />
+                      </div>
+                      <span className="text-xs text-secondary w-10 text-right flex-shrink-0">{pct.toFixed(1)}%</span>
+                      <span className="text-sm font-semibold tabular-nums text-white private md:w-28 text-right flex-shrink-0 whitespace-nowrap">
+                        {fmtEur(r.totalEur)}
+                      </span>
+                      <span className="text-xs tabular-nums md:w-16 text-right flex-shrink-0 whitespace-nowrap"
+                        style={{ color: pnlColor(r.pnlPct) }}>
+                        {r.pnlPct != null ? `${pnlSign(r.pnlPct)}${r.pnlPct.toFixed(1)}%` : '—'}
+                      </span>
                     </div>
-                    <span className="text-xs text-secondary w-10 text-right flex-shrink-0">{pct.toFixed(1)}%</span>
-                    <span className="text-sm font-semibold tabular-nums text-white private w-28 text-right flex-shrink-0">
-                      {fmtEur(r.totalEur)}
-                    </span>
-                    <span className="text-xs tabular-nums w-16 text-right flex-shrink-0"
-                      style={{ color: pnlColor(r.pnlPct) }}>
-                      {r.pnlPct != null ? `${pnlSign(r.pnlPct)}${r.pnlPct.toFixed(1)}%` : '—'}
-                    </span>
                   </div>
                 );
               })}
@@ -314,9 +316,9 @@ const HomePage = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           {/* Bar chart */}
-          <div className="col-span-2 bg-surface border border-white/10 rounded-xl p-5">
+          <div className="md:col-span-2 bg-surface border border-white/10 rounded-xl p-3 md:p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest">
                 {monthsRange === 0 ? 'All time' : `Last ${monthsRange} months`}
@@ -343,8 +345,8 @@ const HomePage = () => {
           </div>
 
           {/* Top expense categories */}
-          <div className="bg-surface border border-white/10 rounded-xl p-5">
-            <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">Top expenses</h3>
+          <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
+            <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-3 md:mb-4">Top expenses</h3>
             {summary?.by_category?.length ? (
               <ul className="space-y-3">
                 {summary.by_category.slice(0, 5).map(({ category, total }, idx) => {

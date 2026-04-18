@@ -332,12 +332,12 @@ function MonthlyPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="h-full overflow-y-auto custom-scrollbar">
-      <div className="px-6 py-6 space-y-5">
+      <div className="px-3 md:px-6 py-3 md:py-6 space-y-4 md:space-y-5">
 
-        <h2 className="text-xl font-bold text-white">Cashflow</h2>
+        <h2 className="text-lg md:text-xl font-bold text-white">Cashflow</h2>
 
         {/* ── Parse controls ─────────────────────────────────────────────── */}
-        <div className="bg-surface border border-white/10 rounded-xl p-4 flex flex-wrap items-center gap-3">
+        <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-4 flex flex-wrap items-center gap-2 md:gap-3">
           <select
             value={selMonth}
             onChange={e => { setSelMonth(e.target.value); setClearConfirm(false); }}
@@ -391,7 +391,7 @@ function MonthlyPage() {
         </div>
 
         {/* ── Summary cards ──────────────────────────────────────────────── */}
-        <div className="grid grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 md:gap-3">
           {[
             { label: 'Avg monthly salary',   value: stats.avgSalary,      color: 'text-white'       },
             { label: 'Avg monthly savings',  value: stats.avgSavings,     color: 'text-accent-gold' },
@@ -404,9 +404,9 @@ function MonthlyPage() {
             { label: 'Total saved',     value: stats.totalSaved,     color: 'text-accent-gold' },
             { label: 'Total invested',  value: stats.totalInvested,  color: 'text-purple-400'  },
           ].map(({ label, value, color }) => (
-            <div key={label} className="bg-surface border border-white/10 rounded-xl p-4">
-              <p className="text-[10px] text-muted uppercase tracking-widest mb-1 leading-tight">{label}</p>
-              <p className={`text-base font-bold tabular-nums private ${color}`}>
+            <div key={label} className="bg-surface border border-white/10 rounded-xl p-3 md:p-4 min-w-0">
+              <p className="text-[10px] text-muted uppercase tracking-widest mb-1 leading-tight truncate">{label}</p>
+              <p className={`text-sm md:text-base font-bold tabular-nums private truncate ${color}`}>
                 {value != null ? fmtEur(value) : '—'}
               </p>
             </div>

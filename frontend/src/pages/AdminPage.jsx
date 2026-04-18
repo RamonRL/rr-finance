@@ -35,17 +35,17 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar p-6">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="h-full overflow-y-auto custom-scrollbar p-3 md:p-6">
+      <div className="max-w-2xl mx-auto space-y-4 md:space-y-6">
 
         <div>
-          <h2 className="text-xl font-bold text-white">Admin</h2>
-          <p className="text-sm text-secondary mt-1">Set the starting balance for each account before you began tracking transactions.</p>
+          <h2 className="text-lg md:text-xl font-bold text-white">Admin</h2>
+          <p className="text-xs md:text-sm text-secondary mt-1">Set the starting balance for each account before you began tracking transactions.</p>
         </div>
 
         <div className="space-y-3">
           <h3 className="text-[11px] text-secondary uppercase tracking-widest">Active account</h3>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {accounts.map(account => (
               <button
                 key={account.id}
@@ -74,24 +74,24 @@ export default function AdminPage() {
           {accounts.map(account => (
             <div
               key={account.id}
-              className="bg-surface border border-white/10 rounded-xl p-5 flex items-center gap-4"
+              className="bg-surface border border-white/10 rounded-xl p-3 md:p-5 flex flex-wrap md:flex-nowrap items-center gap-3 md:gap-4"
               style={{ borderLeftColor: account.color, borderLeftWidth: 3 }}
             >
-              <div className="text-3xl">{account.icon}</div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-white">{account.name}</p>
-                <p className="text-xs text-secondary mt-0.5">
+              <div className="text-2xl md:text-3xl">{account.icon}</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white truncate">{account.name}</p>
+                <p className="text-xs text-secondary mt-0.5 truncate">
                   Current: <span className="text-gray-300">{fmtEur(account.initial_balance ?? 0)}</span>
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full md:w-auto">
                 <input
                   type="number"
                   step="0.01"
                   placeholder="0.00"
                   value={balances[account.id] ?? ''}
                   onChange={e => setBalances(prev => ({ ...prev, [account.id]: e.target.value }))}
-                  className="bg-elevated border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-muted focus:outline-none focus:border-primary/50 w-36"
+                  className="bg-elevated border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-muted focus:outline-none focus:border-primary/50 flex-1 md:flex-none md:w-36"
                 />
                 <button
                   onClick={() => handleSave(account)}
@@ -110,7 +110,7 @@ export default function AdminPage() {
           ))}
         </div>
 
-        <div className="bg-surface border border-white/10 rounded-xl p-5 text-sm text-secondary space-y-1">
+        <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5 text-xs md:text-sm text-secondary space-y-1">
           <p className="font-semibold text-white">What is the initial balance?</p>
           <p>This is the amount you had in each account before you started recording transactions here. It acts as a baseline so balance calculations are accurate from day one.</p>
         </div>

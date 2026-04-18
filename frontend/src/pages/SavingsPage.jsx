@@ -401,10 +401,10 @@ export default function SavingsPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex gap-4 overflow-hidden">
+    <div className="h-full flex flex-col md:flex-row gap-3 md:gap-4 overflow-y-auto md:overflow-hidden p-3 md:p-0">
 
       {/* ── Left panel ─────────────────────────────────────────────────────── */}
-      <div className="w-1/5 flex-shrink-0 overflow-y-auto custom-scrollbar space-y-3 pr-1">
+      <div className="w-full md:w-1/5 md:flex-shrink-0 md:overflow-y-auto md:custom-scrollbar space-y-3 md:pr-1">
 
         <Section title="Log a deposit">
           <Field label="Date">
@@ -540,10 +540,10 @@ export default function SavingsPage() {
       </div>
 
       {/* ── Right panel ────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 min-w-0">
+      <div className="flex-1 md:overflow-y-auto md:custom-scrollbar space-y-3 md:space-y-4 min-w-0">
 
         {/* Summary bar */}
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2">
           {[
             { label: 'Total gross interest', value: fmtEur(summary.totalGross), color: 'text-accent-green' },
             { label: 'Total net interest', value: fmtEur(summary.totalNet), color: 'text-accent-green' },
@@ -565,8 +565,8 @@ export default function SavingsPage() {
         </div>
 
         {/* Deposits table */}
-        <div className="bg-surface border border-white/10 rounded-xl p-5">
-          <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">Deposits</h3>
+        <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
+          <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-3 md:mb-4">Deposits</h3>
           {sortedDeposits.length === 0 ? (
             <p className="text-muted text-sm">No deposits logged yet.</p>
           ) : (
@@ -651,12 +651,13 @@ export default function SavingsPage() {
         </div>
 
         {/* Account snapshots table */}
-        <div className="bg-surface border border-white/10 rounded-xl p-5">
-          <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">Account snapshots</h3>
+        <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
+          <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-3 md:mb-4">Account snapshots</h3>
           {sortedSnapshots.length === 0 ? (
             <p className="text-muted text-sm">No snapshots logged yet.</p>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="text-left text-[10px] text-muted uppercase tracking-widest border-b border-white/[0.06]">
                   {['Month','Balance','TAE','Gross interest','IRPF','Net interest','Actions'].map(h => (
@@ -736,14 +737,16 @@ export default function SavingsPage() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 
         {/* Premium payments table */}
         {sortedPremiums.length > 0 && (
-          <div className="bg-surface border border-white/10 rounded-xl p-5">
-            <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">Premium fee payments</h3>
-            <table className="w-full text-sm">
+          <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
+            <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-3 md:mb-4">Premium fee payments</h3>
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
               <thead>
                 <tr className="text-left text-[10px] text-muted uppercase tracking-widest border-b border-white/[0.06]">
                   <th className="pb-2 pr-4 font-medium">Month</th>
@@ -772,15 +775,16 @@ export default function SavingsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
         {/* Charts 2×2 grid */}
         {allMonths.length > 0 ? (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
 
             {/* Chart 1: Cumulative interest */}
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">
                 Cumulative interest earned
               </h3>
@@ -801,7 +805,7 @@ export default function SavingsPage() {
             </div>
 
             {/* Chart 2: Balance + locked in deposits */}
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">
                 Balance & locked in deposits
               </h3>
@@ -820,7 +824,7 @@ export default function SavingsPage() {
             </div>
 
             {/* Chart 3: Monthly interest breakdown + premium fee */}
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">
                 Monthly interest breakdown
               </h3>
@@ -841,7 +845,7 @@ export default function SavingsPage() {
             </div>
 
             {/* Chart 4: TAE evolution */}
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">
                 TAE evolution
               </h3>
