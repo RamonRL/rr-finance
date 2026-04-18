@@ -4,10 +4,10 @@
 
 :root {
   color-scheme: dark;
-  --bg-base: #080f1a;
-  --bg-surface: #0e1c2f;
-  --bg-elevated: #162540;
-  --bg-overlay: rgba(14,28,47,0.85);
+  --bg-base: #05090F;
+  --bg-surface: #0b1524;
+  --bg-elevated: #13243d;
+  --bg-overlay: rgba(10, 20, 36, 0.78);
 
   --accent-green: #00c896;
   --accent-red: #ff5c5c;
@@ -20,12 +20,18 @@
 
   --border-subtle: rgba(255,255,255,0.06);
   --border-default: rgba(255,255,255,0.10);
+
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 body {
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv02";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Thin scrollbar: 4px, muted thumb, transparent track */
@@ -63,11 +69,37 @@ input, select, textarea {
   color-scheme: dark;
 }
 
-/* Tabular nums for financial values */
+/* Tabular nums for financial values — uses IBM Plex Mono for a terminal/trading feel */
 .tabular-nums {
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "zero";
+  letter-spacing: -0.01em;
+}
+
+/* Explicit mono alias for stats/values */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.01em;
+}
+
+/* Small-caps / terminal-style labels (optional utility) */
+.label-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 /* Hide scrollbar but keep scrollability (used for mobile nav) */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Mobile drawer slide-in */
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}

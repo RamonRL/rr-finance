@@ -7,13 +7,17 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Outfit', 'sans-serif'],
+        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+      },
+      width: {
+        sidebar: '14rem',
       },
       colors: {
-        background: '#080f1a',
-        surface: '#0e1c2f',
-        elevated: '#162540',
-        overlay: 'rgba(14, 28, 47, 0.85)',
+        background: '#05090F',
+        surface: '#0b1524',
+        elevated: '#13243d',
+        overlay: 'rgba(10, 20, 36, 0.78)',
         primary: '#00c896',
         secondary: '#7a95b2',
         muted: '#3d5a78',
