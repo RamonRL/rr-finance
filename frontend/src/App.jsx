@@ -199,7 +199,7 @@ function Sidebar({ onLogout, onNavigate, className = '' }) {
       {/* Brand */}
       <div className="px-5 pt-6 pb-5 border-b border-white/[0.06]">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="RR Finance" className="h-10 w-auto" />
+          <img src="/newlogo.png" alt="RR Finance" className="h-10 w-auto" />
           <div>
             <h1 className="text-[15px] font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-accent-green to-accent-blue">
               RR Finance
@@ -275,7 +275,7 @@ function TopBar({ onOpenDrawer, onLogout }) {
           <IconMenu />
         </button>
         <div className="md:hidden flex items-center gap-2 min-w-0">
-          <img src="/logo.png" alt="" className="h-7 w-auto" />
+          <img src="/newlogo.png" alt="" className="h-7 w-auto" />
           <span className="text-sm font-semibold truncate">RR Finance</span>
         </div>
 
