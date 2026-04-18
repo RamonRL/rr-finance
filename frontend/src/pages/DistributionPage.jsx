@@ -34,6 +34,7 @@ export default function DistributionPage() {
   const [evData]        = useStore(EVO_KEY, {});
   const [savedTargets, persistTargets]    = useStore(DIST_KEY, null);
   const [justSaved, setJustSaved]         = useState(false);
+  const [mobileFormOpen, setMobileFormOpen] = useState(false);
 
   // ── DCA-derived data ──────────────────────────────────────────────────────
   const dcaByAsset = useMemo(() => {
@@ -366,11 +367,23 @@ export default function DistributionPage() {
   }
 
   return (
-    <div className="h-full flex gap-6 overflow-hidden">
+    <div className="h-full flex flex-col md:flex-row gap-3 md:gap-6 md:overflow-hidden overflow-y-auto">
 
       {/* ── Left panel: target editor ─────────────────────────────────────── */}
-      <div className="w-1/5 flex-shrink-0 overflow-y-auto custom-scrollbar">
-        <div className="bg-surface border border-white/10 rounded-xl p-5 space-y-5">
+      <div className="w-full md:w-1/5 md:flex-shrink-0 md:overflow-y-auto md:custom-scrollbar space-y-3">
+        {/* Mobile toggle */}
+        <button
+          onClick={() => setMobileFormOpen(o => !o)}
+          className="md:hidden w-full flex items-center justify-between px-4 py-3 bg-surface border border-white/10 rounded-xl text-sm font-semibold text-white hover:border-accent-green/40 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-accent-green text-base leading-none">{mobileFormOpen ? '×' : '+'}</span>
+            Target distribution
+          </span>
+          <span className="text-xs text-muted">{mobileFormOpen ? 'Close' : 'Tap to open'}</span>
+        </button>
+
+        <div className={`${mobileFormOpen ? 'block' : 'hidden'} md:block bg-surface border border-white/10 rounded-xl p-3 md:p-5 space-y-5`}>
 
           <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest">
             Target distribution
@@ -475,7 +488,7 @@ export default function DistributionPage() {
       </div>
 
       {/* ── Right panel ───────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6">
+      <div className="flex-1 md:overflow-y-auto md:custom-scrollbar space-y-4 md:space-y-6 min-w-0">
 
         {/* Current distribution */}
         <div className="bg-surface border border-white/10 rounded-xl overflow-hidden">
@@ -698,7 +711,7 @@ export default function DistributionPage() {
 
         {/* Exact-fit calculator */}
         {exactFit && (
-          <div className="bg-surface border border-white/10 rounded-xl p-5 space-y-4">
+          <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5 space-y-4">
             <div>
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-1">
                 Exact-fit calculator

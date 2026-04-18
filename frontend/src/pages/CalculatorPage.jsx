@@ -83,6 +83,7 @@ const BarTooltip = ({ active, payload, label }) => {
 };
 
 export default function CalculatorPage() {
+  const [mobileFormOpen,   setMobileFormOpen]   = useState(false);
   const [initialBalance,   setInitialBalance]   = useState('1000');
   const [periodicDeposit,  setPeriodicDeposit]  = useState('100');
   const [freqIndex,        setFreqIndex]        = useState(0);       // Monthly
@@ -128,11 +129,23 @@ export default function CalculatorPage() {
   const barSize = Math.max(6, Math.min(28, Math.floor(260 / Math.max(data.length, 1))));
 
   return (
-    <div className="h-full flex gap-6 overflow-hidden">
+    <div className="h-full flex flex-col md:flex-row gap-3 md:gap-6 md:overflow-hidden overflow-y-auto">
 
       {/* ── Left panel: inputs ─────────────────────────────────────────────── */}
-      <div className="w-1/5 flex-shrink-0 overflow-y-auto custom-scrollbar">
-        <div className="bg-surface border border-white/10 rounded-xl p-5 space-y-4">
+      <div className="w-full md:w-1/5 md:flex-shrink-0 md:overflow-y-auto md:custom-scrollbar space-y-3">
+        {/* Mobile toggle */}
+        <button
+          onClick={() => setMobileFormOpen(o => !o)}
+          className="md:hidden w-full flex items-center justify-between px-4 py-3 bg-surface border border-white/10 rounded-xl text-sm font-semibold text-white hover:border-accent-green/40 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-accent-green text-base leading-none">{mobileFormOpen ? '×' : '+'}</span>
+            Compound interest
+          </span>
+          <span className="text-xs text-muted">{mobileFormOpen ? 'Close' : 'Tap to open'}</span>
+        </button>
+
+        <div className={`${mobileFormOpen ? 'block' : 'hidden'} md:block bg-surface border border-white/10 rounded-xl p-3 md:p-5 space-y-4`}>
 
           <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest">
             Compound interest
@@ -187,7 +200,7 @@ export default function CalculatorPage() {
       </div>
 
       {/* ── Right panel: results ───────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6">
+      <div className="flex-1 md:overflow-y-auto md:custom-scrollbar space-y-4 md:space-y-6 min-w-0">
 
         {data.length === 0 && (
           <div className="h-40 flex items-center justify-center text-muted text-sm">
@@ -197,7 +210,7 @@ export default function CalculatorPage() {
 
         {/* Summary */}
         {last && (
-          <div className="bg-surface border border-white/10 rounded-xl p-6">
+          <div className="bg-surface border border-white/10 rounded-xl p-4 md:p-6">
             <p className="text-[11px] text-secondary uppercase tracking-widest mb-1">You can save</p>
             <p className="text-3xl font-bold text-white tabular-nums private mb-1">
               {fmtEur(last.balance)}
@@ -206,7 +219,7 @@ export default function CalculatorPage() {
               saving {fmtEur(pd)} {freq.label.toLowerCase()} for {dur} year{dur !== 1 ? 's' : ''}
             </p>
 
-            <div className="grid grid-cols-3 gap-3 mt-5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3 mt-4 md:mt-5">
               {[
                 { label: 'Initial balance',   value: fmtEur(ib),               color: C.initial  },
                 { label: 'Periodic deposits', value: fmtEur(last.cumDeposits),  color: C.deposits },
@@ -229,10 +242,10 @@ export default function CalculatorPage() {
 
         {/* Charts */}
         {last && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
 
             {/* Pie */}
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h4 className="text-[11px] text-secondary uppercase tracking-widest mb-4">
                 Distribution
               </h4>
@@ -263,7 +276,7 @@ export default function CalculatorPage() {
             </div>
 
             {/* Bar */}
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h4 className="text-[11px] text-secondary uppercase tracking-widest mb-4">
                 Growth over time
               </h4>

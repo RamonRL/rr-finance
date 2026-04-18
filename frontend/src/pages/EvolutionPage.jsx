@@ -198,6 +198,7 @@ export default function EvolutionPage() {
   const [contributions] = useStore(DCA_KEY, []);
   const [evData, persistEv] = useStore(EVO_KEY, {});
   const [selectedAsset, setSelectedAsset] = useState('');
+  const [mobileFormOpen, setMobileFormOpen] = useState(false);
 
   // DCA meta per asset
   const dcaByAsset = useMemo(() => {
@@ -471,11 +472,23 @@ export default function EvolutionPage() {
   }
 
   return (
-    <div className="h-full flex gap-6 overflow-hidden">
+    <div className="h-full flex flex-col md:flex-row gap-3 md:gap-6 md:overflow-hidden overflow-y-auto">
 
       {/* Left panel */}
-      <div className="w-1/5 flex-shrink-0 overflow-y-auto custom-scrollbar">
-        <div className="bg-surface border border-white/10 rounded-xl p-5 sticky top-0 space-y-4">
+      <div className="w-full md:w-1/5 md:flex-shrink-0 md:overflow-y-auto md:custom-scrollbar space-y-3">
+        {/* Mobile toggle */}
+        <button
+          onClick={() => setMobileFormOpen(o => !o)}
+          className="md:hidden w-full flex items-center justify-between px-4 py-3 bg-surface border border-white/10 rounded-xl text-sm font-semibold text-white hover:border-accent-green/40 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-accent-green text-base leading-none">{mobileFormOpen ? '×' : '+'}</span>
+            Portfolio value
+          </span>
+          <span className="text-xs text-muted">{mobileFormOpen ? 'Close' : 'Tap to open'}</span>
+        </button>
+
+        <div className={`${mobileFormOpen ? 'block' : 'hidden'} md:block bg-surface border border-white/10 rounded-xl p-3 md:p-5 md:sticky md:top-0 space-y-4`}>
 
           {/* Summary cards */}
           <div className="space-y-2">
@@ -587,7 +600,7 @@ export default function EvolutionPage() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6">
+      <div className="flex-1 md:overflow-y-auto md:custom-scrollbar space-y-4 md:space-y-6 min-w-0">
 
         {/* Evolution table */}
         <div className="bg-surface border border-white/10 rounded-xl overflow-hidden">
@@ -883,7 +896,7 @@ export default function EvolutionPage() {
         {assetRows.some((r) => r.totalEur > 0) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">
                 Portfolio by type
               </h3>
@@ -914,7 +927,7 @@ export default function EvolutionPage() {
               </div>
             </div>
 
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">
                 Assets by type
               </h3>
@@ -943,7 +956,7 @@ export default function EvolutionPage() {
             </p>
 
             {/* Chart 1: Contributed vs Value */}
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h4 className="text-xs text-secondary uppercase tracking-widest mb-4">
                 Capital invested vs actual value
               </h4>
@@ -964,7 +977,7 @@ export default function EvolutionPage() {
             </div>
 
             {/* Chart 2: +/- € */}
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h4 className="text-xs text-secondary uppercase tracking-widest mb-4">+/- € over time</h4>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={chartData}>
@@ -984,7 +997,7 @@ export default function EvolutionPage() {
             </div>
 
             {/* Chart 3: +/- % */}
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h4 className="text-xs text-secondary uppercase tracking-widest mb-4">+/- % over time</h4>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={chartData}>

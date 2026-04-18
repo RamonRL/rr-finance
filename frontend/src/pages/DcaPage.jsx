@@ -101,6 +101,7 @@ const BarTooltip = ({ active, payload, label }) => {
 const DcaPage = () => {
   const [contributions, persistContributions] = useStore('rr-finance-dca-contributions', []);
   const [activeTab, setActiveTab] = useState('existing');
+  const [mobileFormOpen, setMobileFormOpen] = useState(false);
   const [existingForm, setExistingForm] = useState(EMPTY_EXISTING_FORM);
   const [newForm, setNewForm] = useState(EMPTY_NEW_FORM);
 
@@ -247,11 +248,23 @@ const DcaPage = () => {
   const inputCls = 'bg-elevated border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-muted focus:outline-none focus:border-primary';
 
   return (
-    <div className="h-full flex gap-6 overflow-hidden">
+    <div className="h-full flex flex-col md:flex-row gap-3 md:gap-6 md:overflow-hidden overflow-y-auto">
 
       {/* ---- Left panel ---- */}
-      <div className="w-1/5 flex-shrink-0 overflow-y-auto custom-scrollbar">
-        <div className="bg-surface border border-white/10 rounded-xl overflow-hidden sticky top-0">
+      <div className="w-full md:w-1/5 md:flex-shrink-0 md:overflow-y-auto md:custom-scrollbar space-y-3">
+        {/* Mobile toggle */}
+        <button
+          onClick={() => setMobileFormOpen(o => !o)}
+          className="md:hidden w-full flex items-center justify-between px-4 py-3 bg-surface border border-white/10 rounded-xl text-sm font-semibold text-white hover:border-accent-green/40 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-accent-green text-base leading-none">{mobileFormOpen ? '×' : '+'}</span>
+            Log contribution
+          </span>
+          <span className="text-xs text-muted">{mobileFormOpen ? 'Close' : 'Tap to open'}</span>
+        </button>
+
+        <div className={`${mobileFormOpen ? 'block' : 'hidden'} md:block bg-surface border border-white/10 rounded-xl overflow-hidden md:sticky md:top-0`}>
           <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest px-5 pt-5 pb-3">
             Log contribution
           </h3>
@@ -435,7 +448,7 @@ const DcaPage = () => {
       </div>
 
       {/* ---- Right panel ---- */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6">
+      <div className="flex-1 md:overflow-y-auto md:custom-scrollbar space-y-4 md:space-y-6 min-w-0">
 
         <div className="bg-surface border border-white/10 rounded-xl overflow-hidden">
           <div className="p-5 border-b border-white/[0.06]">
@@ -595,7 +608,7 @@ const DcaPage = () => {
         {assets.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">
                 Distribution by type
               </h3>
@@ -626,7 +639,7 @@ const DcaPage = () => {
               </div>
             </div>
 
-            <div className="bg-surface border border-white/10 rounded-xl p-5">
+            <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
               <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">
                 Assets by type
               </h3>
