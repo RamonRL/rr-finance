@@ -40,11 +40,8 @@ export default function LoginPage({ onLogin }) {
         <div className="w-full max-w-sm">
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
-            <img src="/newlogo.png" alt="RR Finance" className="h-20 w-auto mb-3" />
-            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent-green to-accent-blue">
-              RR Finance
-            </h1>
-            <p className="text-xs text-secondary mt-1">Personal finance tracker</p>
+            <img src="/newlogo.png" alt="RR Finance" className="h-16 w-auto object-contain mb-3" />
+            <p className="text-xs text-secondary">Personal finance tracker</p>
           </div>
 
           {/* Card */}
