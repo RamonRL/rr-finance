@@ -106,7 +106,7 @@ const HomePage = () => {
   useEffect(() => {
     fetch(`${API_URL}/balances`)
       .then(r => r.ok ? r.json() : [])
-      .then(d => { if (Array.isArray(d)) setBalances(d); })
+      .then(d => { if (Array.isArray(d)) setBalances([...d].sort((a, b) => a.id - b.id)); })
       .catch(() => {});
   }, []);
 
