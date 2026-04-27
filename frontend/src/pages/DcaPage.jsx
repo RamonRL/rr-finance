@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { useStore } from '../hooks/useStore';
 import { getStore, setStore } from '../api/store';
+import { IconClose, IconPlus, IconCheck, IconPencil, IconTrash } from '../components/icons';
 
 const EVO_KEY = 'rr-finance-evolution-data';
 const START_MONTH = '2026-02';
@@ -258,7 +259,7 @@ const DcaPage = () => {
           className="md:hidden w-full flex items-center justify-between px-4 py-3 bg-surface border border-white/10 rounded-xl text-sm font-semibold text-white hover:border-accent-green/40 transition-colors"
         >
           <span className="flex items-center gap-2">
-            <span className="text-accent-green text-base leading-none">{mobileFormOpen ? '×' : '+'}</span>
+            <span className="text-accent-green leading-none">{mobileFormOpen ? <IconClose size={16} /> : <IconPlus size={16} />}</span>
             Log contribution
           </span>
           <span className="text-xs text-muted">{mobileFormOpen ? 'Close' : 'Tap to open'}</span>
@@ -434,9 +435,9 @@ const DcaPage = () => {
                         </div>
                         <button
                           onClick={() => handleDeleteContribution(c.id)}
-                          className="text-muted hover:text-red-400 transition-colors text-xs leading-none mt-0.5 flex-shrink-0"
+                          className="text-muted hover:text-red-400 transition-colors leading-none mt-0.5 flex-shrink-0 inline-flex items-center"
                           title="Remove this contribution"
-                        >✕</button>
+                        ><IconTrash size={14} /></button>
                       </div>
                     );
                   })}
@@ -493,20 +494,20 @@ const DcaPage = () => {
                           {editingAsset === a.assetName ? (
                             <div className="flex items-center justify-center gap-2">
                               <button onClick={handleSaveEdit}
-                                className="text-accent-green hover:opacity-80 transition-opacity leading-none text-sm"
-                                title="Save changes">✓</button>
+                                className="text-accent-green hover:opacity-80 transition-opacity leading-none inline-flex items-center"
+                                title="Save changes"><IconCheck size={14} /></button>
                               <button onClick={() => setEditingAsset(null)}
-                                className="text-muted hover:text-white transition-colors leading-none text-xs"
-                                title="Cancel">✕</button>
+                                className="text-muted hover:text-white transition-colors leading-none inline-flex items-center"
+                                title="Cancel"><IconClose size={12} /></button>
                             </div>
                           ) : (
                             <div className="flex items-center justify-center gap-2">
                               <button onClick={() => startEdit(a)}
-                                className="text-muted hover:text-white transition-colors leading-none text-xs"
-                                title="Edit asset">✏</button>
+                                className="text-muted hover:text-white transition-colors leading-none inline-flex items-center"
+                                title="Edit asset"><IconPencil size={12} /></button>
                               <button onClick={() => handleDelete(a.assetName)}
-                                className="text-muted hover:text-red-400 transition-colors leading-none text-xs"
-                                title="Remove asset">✕</button>
+                                className="text-muted hover:text-red-400 transition-colors leading-none inline-flex items-center"
+                                title="Remove asset"><IconTrash size={12} /></button>
                             </div>
                           )}
                         </td>

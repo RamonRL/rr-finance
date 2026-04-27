@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useStore } from '../hooks/useStore';
 import { NavLink, Routes, Route, Navigate } from 'react-router-dom';
+import { IconPencil } from '../components/icons';
 import {
   ComposedChart, BarChart, Bar, Line,
   XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
@@ -498,7 +499,7 @@ function MonthlyPage() {
                             ) : (
                               <span className={`${cellColor(row.key, val)} private`}>
                                 {val != null ? fmtEur(val) : '—'}
-                                {overridden && <span className="ml-1 text-[9px] opacity-50">✎</span>}
+                                {overridden && <span className="ml-1 inline-flex align-middle opacity-50"><IconPencil size={10} /></span>}
                               </span>
                             )}
                           </td>

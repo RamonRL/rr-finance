@@ -7,6 +7,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer,
   Legend, CartesianGrid,
 } from 'recharts';
+import { IconArrowRight } from '../components/icons';
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 const PRED_KEY       = 'rr-predictions-config';
@@ -388,12 +389,12 @@ export default function PredictionsPage() {
                   {netMonthly != null ? (
                     <>
                       <p className="text-white font-medium private">{fmtEur2(netMonthly)} net</p>
-                      <p className="text-accent-gold private">→ Savings: {fmtEur2(cfg.monthlySavings || 0)} ({netMonthly > 0 ? fmtPct(((cfg.monthlySavings || 0) / netMonthly) * 100) : '0%'})</p>
-                      <p style={{ color: '#6366f1' }} className="private">→ Invest: {fmtEur2(cfg.monthlyInvestments || 0)} ({netMonthly > 0 ? fmtPct(((cfg.monthlyInvestments || 0) / netMonthly) * 100) : '0%'})</p>
-                      <p className="text-accent-blue private">→ Expenses: {fmtEur2(monthlyExpenses || 0)} ({netMonthly > 0 ? fmtPct(((monthlyExpenses || 0) / netMonthly) * 100) : '0%'})</p>
+                      <p className="text-accent-gold private inline-flex items-center gap-1"><IconArrowRight size={11} /> Savings: {fmtEur2(cfg.monthlySavings || 0)} ({netMonthly > 0 ? fmtPct(((cfg.monthlySavings || 0) / netMonthly) * 100) : '0%'})</p>
+                      <p style={{ color: '#6366f1' }} className="private inline-flex items-center gap-1"><IconArrowRight size={11} /> Invest: {fmtEur2(cfg.monthlyInvestments || 0)} ({netMonthly > 0 ? fmtPct(((cfg.monthlyInvestments || 0) / netMonthly) * 100) : '0%'})</p>
+                      <p className="text-accent-blue private inline-flex items-center gap-1"><IconArrowRight size={11} /> Expenses: {fmtEur2(monthlyExpenses || 0)} ({netMonthly > 0 ? fmtPct(((monthlyExpenses || 0) / netMonthly) * 100) : '0%'})</p>
                       {unallocated != null && Math.abs(unallocated) > 0.01 && (
-                        <p style={{ color: unallocated < 0 ? '#ff5c5c' : '#00c896' }}>
-                          → Unalloc: {fmtEur2(unallocated)}
+                        <p style={{ color: unallocated < 0 ? '#ff5c5c' : '#00c896' }} className="inline-flex items-center gap-1">
+                          <IconArrowRight size={11} /> Unalloc: {fmtEur2(unallocated)}
                         </p>
                       )}
                     </>

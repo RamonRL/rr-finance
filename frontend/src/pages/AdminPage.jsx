@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../constants';
 import { useAccount } from '../AccountContext';
+import { AccountIcon, IconCheck } from '../components/icons';
 
 const fmtEur = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v);
 
@@ -61,7 +62,7 @@ export default function AdminPage() {
                   color: '#9ca3af',
                 }}
               >
-                <span>{account.icon}</span>
+                <AccountIcon name={account.icon} size={16} />
                 <span>{account.name}</span>
               </button>
             ))}
@@ -77,7 +78,7 @@ export default function AdminPage() {
               className="bg-surface border border-white/10 rounded-xl p-3 md:p-5 flex flex-wrap md:flex-nowrap items-center gap-3 md:gap-4"
               style={{ borderLeftColor: account.color, borderLeftWidth: 3 }}
             >
-              <div className="text-2xl md:text-3xl">{account.icon}</div>
+              <div className="text-secondary"><AccountIcon name={account.icon} size={28} /></div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white truncate">{account.name}</p>
                 <p className="text-xs text-secondary mt-0.5 truncate">
@@ -103,7 +104,7 @@ export default function AdminPage() {
                     color: account.color,
                   }}
                 >
-                  {saving === account.id ? '...' : saved === account.id ? '✓ Saved' : 'Save'}
+                  {saving === account.id ? '...' : saved === account.id ? <span className="inline-flex items-center justify-center gap-1.5"><IconCheck size={14} /> Saved</span> : 'Save'}
                 </button>
               </div>
             </div>

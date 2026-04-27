@@ -5,6 +5,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
 } from 'recharts';
 import { API_URL } from '../constants';
+import { IconTrash } from '../components/icons';
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 const DEPOSITS_KEY = 'rr-savings-deposits';
@@ -517,8 +518,8 @@ export default function SavingsPage() {
                         if (newDeps.some((d, i) => d !== deposits[i])) persistDeposits(newDeps);
                         refreshBalance();
                       }}
-                      className="text-muted hover:text-red-400 transition-colors text-xs leading-none"
-                      title="Delete">✕</button>
+                      className="text-muted hover:text-red-400 transition-colors leading-none inline-flex items-center"
+                      title="Delete"><IconTrash size={14} /></button>
                   </div>
                 </div>
               ))}

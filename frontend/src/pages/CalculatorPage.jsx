@@ -3,6 +3,7 @@ import {
   PieChart, Pie, Cell,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
+import { IconClose, IconPlus } from '../components/icons';
 
 const fmtEur = (v) =>
   new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
@@ -139,7 +140,7 @@ export default function CalculatorPage() {
           className="md:hidden w-full flex items-center justify-between px-4 py-3 bg-surface border border-white/10 rounded-xl text-sm font-semibold text-white hover:border-accent-green/40 transition-colors"
         >
           <span className="flex items-center gap-2">
-            <span className="text-accent-green text-base leading-none">{mobileFormOpen ? '×' : '+'}</span>
+            <span className="text-accent-green leading-none">{mobileFormOpen ? <IconClose size={16} /> : <IconPlus size={16} />}</span>
             Compound interest
           </span>
           <span className="text-xs text-muted">{mobileFormOpen ? 'Close' : 'Tap to open'}</span>

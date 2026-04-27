@@ -74,15 +74,15 @@ INCOME_CATEGORIES = ["Salary", "Investment", "Gift", "Refund", "Bizum", "Gamblin
 INVESTMENT_TYPES = ["Fund", "ETF", "Stock", "Pension", "Crypto", "Other"]
 
 DEFAULT_ACCOUNTS = [
-    {"id": 1, "name": "Personal", "icon": "👤", "color": "#22c55e"},
-    {"id": 3, "name": "Savings",  "icon": "🏦", "color": "#f59e0b"},
+    {"id": 1, "name": "Personal", "icon": "user", "color": "#22c55e"},
+    {"id": 3, "name": "Savings",  "icon": "bank", "color": "#f59e0b"},
 ]
 
 
 class Account(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
-    icon: str = "💳"
+    icon: str = "card"
     color: str = "#22c55e"
     initial_balance: float = Field(default=0.0)
 
@@ -147,6 +147,13 @@ def create_db():
             conn.execute(text('UPDATE "transaction" SET account_id = 1 WHERE account_id = 2'))
             conn.execute(text("DELETE FROM transfer WHERE from_account_id = 2 OR to_account_id = 2"))
             conn.execute(text("DELETE FROM account WHERE id = 2"))
+            conn.commit()
+
+        # Migrate legacy emoji icons to icon-name keys
+        with contextlib.suppress(Exception):
+            conn.execute(text("UPDATE account SET icon = 'user' WHERE icon = '👤'"))
+            conn.execute(text("UPDATE account SET icon = 'bank' WHERE icon = '🏦'"))
+            conn.execute(text("UPDATE account SET icon = 'card' WHERE icon = '💳'"))
             conn.commit()
 
     # --- Phase 2: Create all tables ---

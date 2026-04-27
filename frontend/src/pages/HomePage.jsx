@@ -4,6 +4,14 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } fro
 import { API_URL } from '../constants';
 import { useAccount } from '../AccountContext';
 import { useStore } from '../hooks/useStore';
+import {
+  AccountIcon,
+  IconTrendUp,
+  IconTrendDown,
+  IconScale,
+  IconPieChart,
+  IconWallet,
+} from '../components/icons';
 
 const now = new Date();
 const fmtEur = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v);
@@ -27,13 +35,14 @@ const TYPE_COLORS = {
 
 
 // ── Components ────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, color, icon, valueColor }) {
+function KpiCard({ label, value, color, Icon, valueColor }) {
   const stripe = color.includes('green') ? 'var(--accent-green)' : color.includes('red') ? 'var(--accent-red)' : 'var(--accent-blue)';
+  const iconColor = color.includes('green') ? 'text-accent-green' : color.includes('red') ? 'text-accent-red' : 'text-accent-blue';
   return (
     <div className="bg-surface rounded-xl p-3 md:p-5 flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4 min-w-0"
       style={{ borderTop: '1px solid var(--border-default)', borderLeft: `2px solid ${stripe}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
-      <div className={`w-8 h-8 md:w-12 md:h-12 rounded-lg flex items-center justify-center text-base md:text-2xl ${color}`}>
-        {icon}
+      <div className={`w-8 h-8 md:w-12 md:h-12 rounded-lg flex items-center justify-center ${color} ${iconColor}`}>
+        {Icon ? <Icon size={20} /> : null}
       </div>
       <div className="min-w-0 w-full">
         <p className="text-[10px] md:text-[11px] text-secondary uppercase tracking-[0.08em] truncate">{label}</p>
@@ -192,9 +201,9 @@ const HomePage = () => {
 
         {/* Monthly KPI cards */}
         <div className="grid grid-cols-3 gap-2 md:gap-4">
-          <KpiCard label="Income"   value={summary?.income    ?? 0} color="bg-accent-green/20" icon="📈" valueColor="text-accent-green" />
-          <KpiCard label="Expenses" value={summary?.expenses  ?? 0} color="bg-accent-red/20"   icon="📉" valueColor="text-accent-red" />
-          <KpiCard label="Balance"  value={summary?.balance   ?? 0} color="bg-accent-blue/20"  icon="⚖️" />
+          <KpiCard label="Income"   value={summary?.income    ?? 0} color="bg-accent-green/20" Icon={IconTrendUp}   valueColor="text-accent-green" />
+          <KpiCard label="Expenses" value={summary?.expenses  ?? 0} color="bg-accent-red/20"   Icon={IconTrendDown} valueColor="text-accent-red" />
+          <KpiCard label="Balance"  value={summary?.balance   ?? 0} color="bg-accent-blue/20"  Icon={IconScale} />
         </div>
 
         {/* Account balances — bank accounts + portfolio card */}
@@ -206,7 +215,7 @@ const HomePage = () => {
               {balances.map(acc => (
                 <div key={acc.id} className="min-w-0 md:flex-1 md:min-w-[140px] bg-background/50 rounded-lg p-3 md:p-4 border border-white/[0.06]">
                   <div className="flex items-center gap-2 mb-2">
-                    <span>{acc.icon}</span>
+                    <span className="text-secondary"><AccountIcon name={acc.icon} size={16} /></span>
                     <span className="text-xs text-secondary truncate">{acc.name}</span>
                   </div>
                   <p className="text-base md:text-xl font-bold tabular-nums truncate" style={{ color: acc.balance >= 0 ? acc.color : '#ff5c5c' }}>
@@ -220,7 +229,7 @@ const HomePage = () => {
                 <div className="min-w-0 md:flex-1 md:min-w-[140px] bg-background/50 rounded-lg p-3 md:p-4 border border-white/[0.06]"
                   style={{ borderLeft: '2px solid #6366f1' }}>
                   <div className="flex items-center gap-2 mb-2">
-                    <span>📊</span>
+                    <span style={{ color: '#6366f1' }}><IconPieChart size={16} /></span>
                     <span className="text-xs text-secondary">Portfolio</span>
                   </div>
                   <p className="text-base md:text-xl font-bold tabular-nums text-white truncate">
@@ -237,7 +246,7 @@ const HomePage = () => {
               {/* Grand total */}
               <div className="min-w-0 md:flex-1 md:min-w-[140px] bg-background/50 rounded-lg p-3 md:p-4 border border-white/[0.06] col-span-2 md:col-span-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <span>💰</span>
+                  <span className="text-accent-gold"><IconWallet size={16} /></span>
                   <span className="text-xs text-secondary">Total</span>
                 </div>
                 <p className={`text-base md:text-xl font-bold tabular-nums truncate ${grandTotal >= 0 ? 'text-white' : 'text-accent-red'}`}>

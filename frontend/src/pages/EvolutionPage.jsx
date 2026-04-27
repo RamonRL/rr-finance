@@ -1,6 +1,14 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStore } from '../hooks/useStore';
 import {
+  IconClose,
+  IconPlus,
+  IconCheck,
+  IconAlert,
+  IconX,
+  IconPencil,
+} from '../components/icons';
+import {
   ComposedChart, Area, LineChart, Line,
   PieChart, Pie, Cell,
   BarChart, Bar,
@@ -233,7 +241,7 @@ export default function EvolutionPage() {
   }, [assetNames, selectedAsset]);
 
   // Resolve price for a given asset + month.
-  // User-typed manual prices (priceSource !== 'refresh') take priority and show the ✎ indicator.
+  // User-typed manual prices (priceSource !== 'refresh') take priority and show the pencil indicator.
   // Refresh-written prices (priceSource === 'refresh') are treated as non-manual for display purposes.
   const getPrice = useCallback((assetName, month) => {
     const n = dcaByAsset[assetName]?.participations?.[month] || 0;
@@ -482,7 +490,7 @@ export default function EvolutionPage() {
           className="md:hidden w-full flex items-center justify-between px-4 py-3 bg-surface border border-white/10 rounded-xl text-sm font-semibold text-white hover:border-accent-green/40 transition-colors"
         >
           <span className="flex items-center gap-2">
-            <span className="text-accent-green text-base leading-none">{mobileFormOpen ? '×' : '+'}</span>
+            <span className="text-accent-green leading-none">{mobileFormOpen ? <IconClose size={16} /> : <IconPlus size={16} />}</span>
             Portfolio value
           </span>
           <span className="text-xs text-muted">{mobileFormOpen ? 'Close' : 'Tap to open'}</span>
@@ -572,7 +580,7 @@ export default function EvolutionPage() {
                     <span className="text-white tabular-nums private">
                       {row.latestPrice != null ? fmtEur(row.latestPrice) : '—'}
                       {evData[`${row.name}___current`]?.price != null && (
-                        <span className="ml-1 text-[9px] text-accent-gold/70">✎</span>
+                        <span className="ml-1 inline-flex align-middle text-accent-gold/70"><IconPencil size={10} /></span>
                       )}
                     </span>
                   </div>
@@ -638,9 +646,9 @@ export default function EvolutionPage() {
               >
                 {refreshing ? 'Fetching prices…'
                   : !refreshResult ? 'Refresh prices'
-                  : refreshResult.items.every((i) => i.status === 'updated') ? '✓ All updated'
-                  : refreshResult.items.some((i) => i.status === 'updated') ? '⚠ Partial update'
-                  : '✗ All failed'}
+                  : refreshResult.items.every((i) => i.status === 'updated') ? <span className="inline-flex items-center gap-1.5"><IconCheck size={14} /> All updated</span>
+                  : refreshResult.items.some((i) => i.status === 'updated') ? <span className="inline-flex items-center gap-1.5"><IconAlert size={14} /> Partial update</span>
+                  : <span className="inline-flex items-center gap-1.5"><IconX size={14} /> All failed</span>}
               </button>
               {Object.values(evData).some((e) => e.priceIsManual && e.priceSource !== 'refresh') && (
                 <button
@@ -693,23 +701,29 @@ export default function EvolutionPage() {
             <div className="px-5 py-3 border-b border-white/[0.06] bg-background/20">
               <div className="flex flex-wrap gap-x-4 gap-y-1 items-start">
                 {refreshResult.items.map((item) => {
-                  const icon = item.status === 'updated' ? '✓' : item.status === 'skipped' ? '⚠' : '✗';
+                  const StatusIcon = item.status === 'updated' ? IconCheck : item.status === 'skipped' ? IconAlert : IconX;
                   const color = item.status === 'updated' ? '#00c896' : item.status === 'skipped' ? '#f0b429' : '#ff5c5c';
                   const notEur = item.status === 'updated' && item.currency !== 'EUR';
-                  const detail = item.status === 'updated'
-                    ? ` ${item.price?.toFixed(2)} ${item.currency}${notEur ? ' ⚠ not EUR' : ''}`
-                    : ` ${item.reason}`;
                   return (
-                    <span key={item.name} className="text-[11px] tabular-nums whitespace-nowrap" style={{ color }}>
-                      {icon} <span className="text-white">{item.name}</span>{detail}
+                    <span key={item.name} className="text-[11px] tabular-nums whitespace-nowrap inline-flex items-center gap-1" style={{ color }}>
+                      <StatusIcon size={11} /> <span className="text-white">{item.name}</span>
+                      {item.status === 'updated' ? (
+                        <>
+                          {' '}{item.price?.toFixed(2)} {item.currency}
+                          {notEur && <span className="inline-flex items-center gap-0.5"><IconAlert size={11} /> not EUR</span>}
+                        </>
+                      ) : (
+                        <> {item.reason}</>
+                      )}
                     </span>
                   );
                 })}
                 <button
                   onClick={() => setRefreshResult(null)}
-                  className="text-[11px] text-muted hover:text-white transition-colors ml-auto"
+                  aria-label="Dismiss"
+                  className="text-muted hover:text-white transition-colors ml-auto inline-flex items-center"
                 >
-                  ✕
+                  <IconClose size={12} />
                 </button>
               </div>
             </div>
@@ -789,7 +803,7 @@ export default function EvolutionPage() {
                             style={{ minWidth: 0, width: '100%' }}
                           />
                           {evData[`${row.name}___current`]?.price != null && (
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-accent-gold/60 pointer-events-none" title="Current price override">✎</span>
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-accent-gold/60 pointer-events-none" title="Current price override"><IconPencil size={10} /></span>
                           )}
                         </div>
                       </td>
@@ -846,8 +860,8 @@ export default function EvolutionPage() {
                                   />
                                   {isManual && (
                                     <span
-                                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-primary/60 pointer-events-none"
-                                      title="Manual override">✎</span>
+                                      className="absolute right-3 top-1/2 -translate-y-1/2 text-primary/60 pointer-events-none"
+                                      title="Manual override"><IconPencil size={10} /></span>
                                   )}
                                 </div>
                               )}

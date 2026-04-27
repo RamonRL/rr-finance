@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStore } from '../hooks/useStore';
+import { IconClose, IconPlus, IconCheck } from '../components/icons';
 
 const DCA_KEY    = 'rr-finance-dca-contributions';
 const EVO_KEY    = 'rr-finance-evolution-data';
@@ -377,7 +378,7 @@ export default function DistributionPage() {
           className="md:hidden w-full flex items-center justify-between px-4 py-3 bg-surface border border-white/10 rounded-xl text-sm font-semibold text-white hover:border-accent-green/40 transition-colors"
         >
           <span className="flex items-center gap-2">
-            <span className="text-accent-green text-base leading-none">{mobileFormOpen ? '×' : '+'}</span>
+            <span className="text-accent-green leading-none">{mobileFormOpen ? <IconClose size={16} /> : <IconPlus size={16} />}</span>
             Target distribution
           </span>
           <span className="text-xs text-muted">{mobileFormOpen ? 'Close' : 'Tap to open'}</span>
@@ -481,7 +482,7 @@ export default function DistributionPage() {
               cursor: isValid ? 'pointer' : 'not-allowed',
             }}
           >
-            {justSaved ? '✓ Saved' : 'Save targets'}
+            {justSaved ? <span className="inline-flex items-center justify-center gap-1.5"><IconCheck size={14} /> Saved</span> : 'Save targets'}
           </button>
 
         </div>

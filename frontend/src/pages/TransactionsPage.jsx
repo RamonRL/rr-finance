@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../constants';
 import { useAccount } from '../AccountContext';
+import {
+  AccountIcon,
+  IconClose,
+  IconPlus,
+  IconArrowRight,
+  IconArrowLeft,
+  IconArrowLeftRight,
+  IconPencil,
+  IconTrash,
+} from '../components/icons';
 
 const now = new Date();
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -187,7 +197,7 @@ export default function TransactionsPage() {
           className="md:hidden w-full flex items-center justify-between px-4 py-3 bg-surface border border-white/10 rounded-xl text-sm font-semibold text-white hover:border-accent-green/40 transition-colors"
         >
           <span className="flex items-center gap-2">
-            <span className="text-accent-green text-base leading-none">{mobileFormOpen ? '×' : '+'}</span>
+            <span className="text-accent-green leading-none">{mobileFormOpen ? <IconClose size={16} /> : <IconPlus size={16} />}</span>
             {editId ? 'Edit transaction' : 'New transaction'}
           </span>
           <span className="text-xs text-muted">{mobileFormOpen ? 'Close' : 'Tap to open'}</span>
@@ -247,8 +257,8 @@ export default function TransactionsPage() {
         {/* Transfer */}
         <div className={`${mobileFormOpen ? 'block' : 'hidden'} md:block space-y-3`}>
           <button onClick={() => setShowTransferForm(p => !p)}
-            className="w-full bg-accent-gold/20 hover:bg-accent-gold/30 text-accent-gold text-sm font-semibold px-4 py-2 rounded-lg transition-colors border border-accent-gold/30">
-            ⇄ {showTransferForm ? 'Cancel transfer' : 'New transfer'}
+            className="w-full bg-accent-gold/20 hover:bg-accent-gold/30 text-accent-gold text-sm font-semibold px-4 py-2 rounded-lg transition-colors border border-accent-gold/30 flex items-center justify-center gap-2">
+            <IconArrowLeftRight size={16} /> {showTransferForm ? 'Cancel transfer' : 'New transfer'}
           </button>
           {showTransferForm && (
             <div className="bg-surface border border-accent-gold/20 rounded-xl p-4 md:p-5">
@@ -261,8 +271,9 @@ export default function TransactionsPage() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className={labelCls}>From</label>
-                  <div className="bg-elevated border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-secondary">
-                    {selectedAccount?.icon} {selectedAccount?.name}
+                  <div className="bg-elevated border border-white/[0.06] rounded-lg px-3 py-2 text-sm text-secondary flex items-center gap-2">
+                    {selectedAccount && <AccountIcon name={selectedAccount.icon} size={14} />}
+                    {selectedAccount?.name}
                   </div>
                 </div>
                 <div className="flex flex-col gap-1">
@@ -270,7 +281,7 @@ export default function TransactionsPage() {
                   <select value={transferForm.to_account_id}
                     onChange={e => setTransferForm(p => ({ ...p, to_account_id: e.target.value }))} required
                     className="bg-elevated border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-gold/50 w-full">
-                    {otherAccounts.map(a => <option key={a.id} value={a.id}>{a.icon} {a.name}</option>)}
+                    {otherAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </div>
                 <div className="flex flex-col gap-1">
@@ -359,9 +370,11 @@ export default function TransactionsPage() {
                         <td className="px-2 md:px-4 py-2 md:py-3 text-secondary text-xs md:text-sm whitespace-nowrap">{row.date}</td>
                         <td className="px-2 md:px-4 py-2 md:py-3 min-w-0">
                           <div className="flex flex-col md:flex-row md:items-center md:gap-2 min-w-0">
-                            <span className="text-accent-gold font-medium text-xs md:text-sm truncate">⇄ Transfer</span>
-                            <span className="text-[10px] md:text-xs text-secondary truncate">
-                              {isOut ? '→' : '←'}{' '}
+                            <span className="text-accent-gold font-medium text-xs md:text-sm truncate inline-flex items-center gap-1.5">
+                              <IconArrowLeftRight size={14} /> Transfer
+                            </span>
+                            <span className="text-[10px] md:text-xs text-secondary truncate inline-flex items-center gap-1">
+                              {isOut ? <IconArrowRight size={12} /> : <IconArrowLeft size={12} />}
                               <span style={{ color: accountColor(otherId) }}>{accountName(otherId)}</span>
                             </span>
                           </div>
@@ -376,9 +389,9 @@ export default function TransactionsPage() {
                         <td className="px-2 md:px-4 py-2 md:py-3 text-right">
                           <button onClick={() => handleDeleteTransfer(row.id)}
                             aria-label="Delete"
-                            className="text-accent-red/60 hover:text-accent-red transition-colors text-lg md:text-xs leading-none">
-                            <span className="md:hidden">×</span>
-                            <span className="hidden md:inline">Delete</span>
+                            className="text-accent-red/60 hover:text-accent-red transition-colors leading-none inline-flex items-center">
+                            <span className="md:hidden"><IconTrash size={16} /></span>
+                            <span className="hidden md:inline text-xs">Delete</span>
                           </button>
                         </td>
                       </tr>
@@ -403,15 +416,15 @@ export default function TransactionsPage() {
                       <td className="px-2 md:px-4 py-2 md:py-3 text-right whitespace-nowrap">
                         <button onClick={() => handleEdit(row)}
                           aria-label="Edit"
-                          className="text-secondary hover:text-white mr-2 md:mr-3 transition-colors text-lg md:text-xs leading-none">
-                          <span className="md:hidden">✎</span>
-                          <span className="hidden md:inline">Edit</span>
+                          className="text-secondary hover:text-white mr-2 md:mr-3 transition-colors leading-none inline-flex items-center">
+                          <span className="md:hidden"><IconPencil size={16} /></span>
+                          <span className="hidden md:inline text-xs">Edit</span>
                         </button>
                         <button onClick={() => handleDelete(row.id)}
                           aria-label="Delete"
-                          className="text-accent-red/60 hover:text-accent-red transition-colors text-lg md:text-xs leading-none">
-                          <span className="md:hidden">×</span>
-                          <span className="hidden md:inline">Delete</span>
+                          className="text-accent-red/60 hover:text-accent-red transition-colors leading-none inline-flex items-center">
+                          <span className="md:hidden"><IconTrash size={16} /></span>
+                          <span className="hidden md:inline text-xs">Delete</span>
                         </button>
                       </td>
                     </tr>
@@ -436,10 +449,12 @@ export default function TransactionsPage() {
           {totalPages > 1 && (
             <div className="flex items-center gap-1.5 md:gap-2">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="px-2 md:px-3 py-1 rounded-lg border border-white/10 hover:border-white/20 disabled:opacity-30 transition-colors">←</button>
+                aria-label="Previous page"
+                className="px-2 md:px-3 py-1 rounded-lg border border-white/10 hover:border-white/20 disabled:opacity-30 transition-colors inline-flex items-center"><IconArrowLeft size={14} /></button>
               <span>{page} / {totalPages}</span>
               <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="px-2 md:px-3 py-1 rounded-lg border border-white/10 hover:border-white/20 disabled:opacity-30 transition-colors">→</button>
+                aria-label="Next page"
+                className="px-2 md:px-3 py-1 rounded-lg border border-white/10 hover:border-white/20 disabled:opacity-30 transition-colors inline-flex items-center"><IconArrowRight size={14} /></button>
             </div>
           )}
         </div>
