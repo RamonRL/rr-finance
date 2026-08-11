@@ -368,6 +368,52 @@ def list_transactions(
         return sorted(results, key=lambda t: t.date, reverse=True)
 
 
+@app.get("/descriptions")
+def list_descriptions(
+    account_id: Optional[int] = Query(None),
+    limit: int = Query(600),
+):
+    """Distinct descriptions already used, most frequent first, each with the
+    category it is usually filed under. Feeds the description autocomplete."""
+    with Session(engine) as session:
+        txs = session.exec(select(Transaction)).all()
+
+    if account_id is not None:
+        txs = [t for t in txs if t.account_id == account_id]
+
+    agg: dict[str, dict] = {}
+    for t in txs:
+        key = (t.description or "").strip()
+        if not key:
+            continue
+        entry = agg.get(key)
+        if entry is None:
+            entry = agg[key] = {
+                "count": 0,
+                "categories": defaultdict(int),
+                "types": defaultdict(int),
+                "last_used": t.date,
+            }
+        entry["count"] += 1
+        entry["categories"][t.category] += 1
+        entry["types"][t.type] += 1
+        if t.date > entry["last_used"]:
+            entry["last_used"] = t.date
+
+    result = [
+        {
+            "description": key,
+            "count": e["count"],
+            "category": max(e["categories"].items(), key=lambda kv: kv[1])[0],
+            "type": max(e["types"].items(), key=lambda kv: kv[1])[0],
+            "last_used": e["last_used"].isoformat(),
+        }
+        for key, e in agg.items()
+    ]
+    result.sort(key=lambda r: (-r["count"], r["description"].lower()))
+    return result[:limit]
+
+
 @app.patch("/transactions/{tx_id}", response_model=Transaction)
 def update_transaction(tx_id: int, data: TransactionUpdate):
     with Session(engine) as session:

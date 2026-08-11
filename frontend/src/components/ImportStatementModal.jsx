@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { API_URL } from '../constants';
 import { IconClose, IconArrowLeft, IconArrowRight, IconCheck, IconTrash } from './icons';
+import DescriptionInput from './DescriptionInput';
 
 const EXPENSE_CATEGORIES = ['Housing','Food & Groceries','Transport','Health','Entertainment','Shopping','Utilities','Subscriptions','Travel','Music','Fuel','Bizum','Gambling','Investments','Common','Other'];
 const INCOME_CATEGORIES = ['Salary','Investment','Gift','Refund','Bizum','Gambling','Common','Other'];
@@ -32,7 +33,13 @@ const draftFrom = (row) => ({
   notes: '',
 });
 
-export default function ImportStatementModal({ accountId, accountName, onClose, onSaved }) {
+export default function ImportStatementModal({
+  accountId,
+  accountName,
+  onClose,
+  onSaved,
+  descriptions = [],
+}) {
   const [phase, setPhase] = useState('upload');   // upload | review | done
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
@@ -49,6 +56,23 @@ export default function ImportStatementModal({ accountId, accountName, onClose, 
   const [skipped, setSkipped] = useState({});
 
   const descRef = useRef(null);
+
+  // Descriptions confirmed during this import, merged into the autocomplete
+  // straight away so a long session keeps suggesting what you just typed.
+  const [learned, setLearned] = useState([]);
+
+  const allDescriptions = useMemo(() => {
+    const byName = new Map();
+    for (const s of [...descriptions, ...learned]) {
+      const prev = byName.get(s.description);
+      byName.set(s.description, prev
+        ? { ...prev, count: prev.count + s.count }
+        : { ...s });
+    }
+    return [...byName.values()].sort(
+      (a, b) => b.count - a.count || a.description.localeCompare(b.description),
+    );
+  }, [descriptions, learned]);
 
   const queue = useMemo(
     () => (skipDuplicates ? rows.filter(r => !r.duplicate) : rows),
@@ -130,6 +154,12 @@ export default function ImportStatementModal({ accountId, accountName, onClose, 
       }
       const created = await res.json();
       setSavedIds(prev => ({ ...prev, [index]: created.id }));
+      setLearned(prev => [...prev, {
+        description: draft.description.trim(),
+        category: draft.category,
+        type: draft.type,
+        count: 1,
+      }]);
       setError('');
       onSaved?.();
       advance();
@@ -322,9 +352,20 @@ export default function ImportStatementModal({ accountId, accountName, onClose, 
 
             <div className="flex flex-col gap-1">
               <label className={labelCls}>Description</label>
-              <input ref={descRef} type="text" value={draft.description}
-                onChange={e => setDraft(d => ({ ...d, description: e.target.value }))}
-                className={inputCls} />
+              <DescriptionInput
+                inputRef={descRef}
+                value={draft.description}
+                suggestions={allDescriptions}
+                className={inputCls}
+                onChange={v => setDraft(d => ({ ...d, description: v }))}
+                onPick={s => setDraft(d => ({
+                  ...d,
+                  description: s.description,
+                  // Reuse how this description is normally filed, but never
+                  // overwrite a category that is already set.
+                  category: d.category || coerceCategory(s.category, d.type),
+                }))}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

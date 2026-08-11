@@ -12,6 +12,7 @@ import {
   IconTrash,
 } from '../components/icons';
 import ImportStatementModal from '../components/ImportStatementModal';
+import DescriptionInput from '../components/DescriptionInput';
 
 const now = new Date();
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -59,6 +60,7 @@ export default function TransactionsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [showImport, setShowImport] = useState(false);
+  const [descriptions, setDescriptions] = useState([]);
 
   const categories = form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
   const otherAccounts = accounts.filter(a => a.id !== selectedAccount?.id);
@@ -78,6 +80,15 @@ export default function TransactionsPage() {
     fetch(`${API_URL}/transactions?${params}`)
       .then(r => r.ok ? r.json() : [])
       .then(data => { if (Array.isArray(data)) setTransactions(data); })
+      .catch(() => {});
+  };
+
+  // Distinct descriptions already used on this account, for the autocomplete
+  const fetchDescriptions = () => {
+    if (!selectedAccount) return;
+    fetch(`${API_URL}/descriptions?account_id=${selectedAccount.id}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { if (Array.isArray(data)) setDescriptions(data); })
       .catch(() => {});
   };
 
@@ -101,6 +112,7 @@ export default function TransactionsPage() {
       .then(r => r.ok ? r.json() : [])
       .then(data => { if (Array.isArray(data)) setAvailableMonths(data); })
       .catch(() => {});
+    fetchDescriptions();
   }, [selectedAccount]);
 
   useEffect(() => {
@@ -130,6 +142,7 @@ export default function TransactionsPage() {
     setForm(prev => ({ ...emptyForm, date: prev.date }));
     setEditId(null);
     fetchTransactions();
+    fetchDescriptions();
   };
 
   const handleTransferSubmit = async (e) => {
@@ -222,8 +235,22 @@ export default function TransactionsPage() {
             </div>
             <div className="flex flex-col gap-1">
               <label className={labelCls}>Description</label>
-              <input type="text" name="description" value={form.description} onChange={handleFormChange} required
-                placeholder="e.g. Supermarket Mercadona" className={inputCls} />
+              <DescriptionInput
+                value={form.description}
+                suggestions={descriptions}
+                required
+                placeholder="e.g. Supermarket Mercadona"
+                className={inputCls}
+                onChange={v => setForm(prev => ({ ...prev, description: v }))}
+                onPick={s => setForm(prev => {
+                  const list = prev.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+                  return {
+                    ...prev,
+                    description: s.description,
+                    category: list.includes(s.category) ? s.category : prev.category,
+                  };
+                })}
+              />
             </div>
             <div className="flex flex-col gap-1">
               <label className={labelCls}>Amount (€)</label>
@@ -474,10 +501,12 @@ export default function TransactionsPage() {
         <ImportStatementModal
           accountId={selectedAccount.id}
           accountName={selectedAccount.name}
+          descriptions={descriptions}
           onSaved={fetchTransactions}
           onClose={() => {
             setShowImport(false);
             fetchTransactions();
+            fetchDescriptions();
             fetch(`${API_URL}/available-months?account_id=${selectedAccount.id}`)
               .then(r => r.ok ? r.json() : [])
               .then(data => { if (Array.isArray(data)) setAvailableMonths(data); })
