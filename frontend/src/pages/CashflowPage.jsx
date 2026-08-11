@@ -14,7 +14,18 @@ import PredictionsPage from './PredictionsPage';
 const CASHFLOW_KEY  = 'rr-cashflow-data';
 const SAVINGS_ACCT  = 3;
 const PERSONAL_ACCT = 1;
-const START_MONTH   = '2026-03';
+const START_MONTH   = '2026-01';
+
+// March 2026 was a month of heavy one-off money moves. Its values still count
+// towards totals, but they distort every average badly enough to make them
+// useless, so averages skip it. Avg remaining is the exception — one outlier
+// month barely moves it, and dropping it there would hide a real result.
+const AVG_EXCLUDED = new Set(['2026-03']);
+const AVG_EXCLUDED_EXEMPT = new Set(['remaining']);
+
+// Same month dwarfs every other bar in the stacked breakdown, flattening the
+// rest of the year into an unreadable strip.
+const CHART_EXCLUDED = new Set(['2026-03']);
 
 const FIELDS = ['salary', 'savings', 'investments', 'common', 'subscriptions', 'otherWastes'];
 
@@ -28,15 +39,29 @@ const ROWS = [
   { key: 'remaining',     label: 'Remaining',      editable: false, agg: 'avg'       },
 ];
 
+// Percentages are shares of that month's income, so a running total means
+// nothing — every row aggregates as an average. "Other wastes" is left out
+// because it swings too wildly to read as a share.
+const PCT_ROWS = ROWS
+  .filter(r => r.key !== 'otherWastes')
+  .map(r => ({ ...r, editable: false, agg: 'avg' }));
+
 const CLR = {
   salary: '#00c896', savings: '#f0b429', investments: '#6366f1',
   common: '#3d9eff', subscriptions: '#ec4899', otherWastes: '#ff5c5c', remaining: '#ffffff',
 };
 
-// ── Storage ───────────────────────────────────────────────────────────────────
+// Rows shown as a share of income: salary reads as good, money leaving reads as
+// spend, and remaining flips with its sign.
+const PCT_TONE = {
+  salary: 'good', savings: 'spend', investments: 'spend',
+  common: 'spend', subscriptions: 'spend', remaining: 'signed',
+};
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const fmtEur = (v) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
+
+const fmtPct = (v) => (v == null ? '—' : `${v.toFixed(1)}%`);
 
 const toMonthLabel = (ym) => {
   if (!ym) return '';
@@ -54,13 +79,16 @@ const toMonthShort = (ym) => {
 export function parseTxns(transactions, transfers) {
   const used = new Set();
 
-  // Salary: largest transaction with "nómina" in description
-  const salaryTxs = transactions.filter(t => t.description.toLowerCase().includes('nómina'));
-  let salary = null;
-  if (salaryTxs.length) {
-    salary = Math.max(...salaryTxs.map(t => t.amount));
-    salaryTxs.forEach(t => used.add(t.id));
-  }
+  // Salary: every payroll credit in the month, added up. It used to take the
+  // largest one, which silently dropped a second payslip — e.g. July 2026, with
+  // a final settlement from the old employer plus the new employer's payroll.
+  const salaryTxs = transactions.filter(t => {
+    if (t.type !== 'income') return false;
+    const d = t.description.toLowerCase();
+    return d.includes('nómina') || d.includes('nomina') || d.includes('finiquito');
+  });
+  const salary = salaryTxs.length ? salaryTxs.reduce((s, t) => s + t.amount, 0) : null;
+  salaryTxs.forEach(t => used.add(t.id));
 
   // Savings: transfers to Savings account this month
   const savingsTotal = transfers
@@ -95,7 +123,16 @@ export function parseTxns(transactions, transfers) {
     ? restTxs.reduce((s, t) => s + (t.type === 'expense' ? t.amount : -t.amount), 0)
     : null;
 
-  return { salary, savings, investments, common, subscriptions, otherWastes };
+  // Every euro that came in this month — the denominator for the share view.
+  // Not just salary: bizums received, refunds and gifts all count as income.
+  const incomeTotal = transactions
+    .filter(t => t.type === 'income')
+    .reduce((s, t) => s + t.amount, 0);
+
+  return {
+    salary, savings, investments, common, subscriptions, otherWastes,
+    income: incomeTotal > 0 ? incomeTotal : null,
+  };
 }
 
 export function computeRemaining(rec) {
@@ -111,7 +148,7 @@ export function computeRemaining(rec) {
 function emptyRecord(month) {
   return {
     month, salary: null, savings: null, investments: null,
-    common: null, subscriptions: null, otherWastes: null,
+    common: null, subscriptions: null, otherWastes: null, income: null,
     overrides: { salary: false, savings: false, investments: false, common: false, subscriptions: false, otherWastes: false },
   };
 }
@@ -123,23 +160,154 @@ function applyParsed(existing, parsed) {
     : emptyRecord('');
   const next = { ...base };
   FIELDS.forEach(f => { if (!base.overrides[f]) next[f] = parsed[f] ?? null; });
+  // Income is the denominator of the share view, always taken from the ledger
+  next.income = parsed.income ?? null;
   return next;
 }
 
+/** Share of a month's income taken by one row. Null when income is unknown. */
+export function computeShare(rec, key) {
+  const income = rec?.income;
+  if (!income) return null;
+  const val = key === 'remaining' ? computeRemaining(rec) : rec?.[key];
+  return val == null ? null : (val / income) * 100;
+}
+
 // ── Chart tooltip ─────────────────────────────────────────────────────────────
-const ChartTooltip = ({ active, payload, label }) => {
+const ChartTooltip = ({ active, payload, label, fmt = fmtEur }) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-elevated border border-white/10 rounded-lg p-3 text-sm">
       <p className="text-secondary mb-1">{label}</p>
       {payload.map(p => (
         <p key={p.name} style={{ color: p.color || p.fill }}>
-          {p.name}: {fmtEur(p.value)}
+          {p.name}: {fmt(p.value)}
         </p>
       ))}
     </div>
   );
 };
+
+// ── Breakdown table ───────────────────────────────────────────────────────────
+/**
+ * The month-by-month grid, driven entirely by callbacks so the amounts view and
+ * the share-of-income view render from the same markup. Editing is opt-in:
+ * omit `edit` and every cell is read-only, as the share view needs.
+ */
+function BreakdownTable({ rows, months, getValue, format, colorFor, agg, onReparse, edit }) {
+  return (
+    <div className="bg-surface border border-white/10 rounded-xl overflow-hidden">
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="border-separate border-spacing-0"
+          style={{ minWidth: `${140 + months.length * 110 + 110}px` }}>
+          <thead>
+            <tr>
+              <th className="sticky left-0 z-20 bg-elevated px-4 py-3 text-left text-[10px] text-muted uppercase tracking-widest font-medium border-b border-r border-white/[0.06]"
+                style={{ width: 140, minWidth: 140 }}>
+                Category
+              </th>
+
+              {months.map(month => (
+                <th key={month}
+                  className="px-3 py-3 bg-surface text-center text-[10px] text-secondary uppercase tracking-widest font-medium border-b border-white/[0.06]"
+                  style={{ width: 110, minWidth: 110 }}>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span className={AVG_EXCLUDED.has(month) ? 'text-accent-gold' : ''}
+                      title={AVG_EXCLUDED.has(month) ? 'Excluded from averages' : undefined}>
+                      {toMonthShort(month)}
+                    </span>
+                    {AVG_EXCLUDED.has(month) && (
+                      <span className="text-accent-gold/70 text-[9px] leading-none" title="Excluded from averages">*</span>
+                    )}
+                    <button onClick={() => onReparse(month)} title="Re-parse this month"
+                      className="text-muted hover:text-accent-green transition-colors flex-shrink-0">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="1 4 1 10 7 10"/>
+                        <path d="M3.51 15a9 9 0 1 0 .49-3.1"/>
+                      </svg>
+                    </button>
+                  </div>
+                </th>
+              ))}
+
+              <th className="sticky right-0 z-20 bg-elevated px-4 py-3 text-right text-[10px] text-muted uppercase tracking-widest font-medium border-b border-l border-white/[0.06]"
+                style={{ width: 110, minWidth: 110 }}>
+                {rows.some(r => r.agg !== 'avg') ? 'Avg / Total' : 'Average'}
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map(row => (
+              <tr key={row.key} className="hover:bg-white/[0.015] transition-colors">
+                <td className="sticky left-0 z-10 bg-surface px-4 py-2.5 text-sm font-medium text-secondary border-b border-r border-white/[0.06] whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ background: CLR[row.key] ?? '#7a95b2' }} />
+                    {row.label}
+                  </div>
+                </td>
+
+                {months.map(month => {
+                  const val = getValue(month, row.key);
+                  const editable = Boolean(edit) && row.editable;
+                  const isEditing = editable
+                    && edit.cell?.month === month && edit.cell?.field === row.key;
+
+                  return (
+                    <td key={month}
+                      className={`px-3 py-2.5 text-right text-sm tabular-nums border-b border-white/[0.04]
+                        ${editable ? 'cursor-pointer hover:bg-accent-green/[0.04]' : ''}`}
+                      onClick={() => { if (!editable || isEditing) return; edit.start(month, row.key, val); }}>
+                      {isEditing ? (
+                        <input autoFocus type="number" step="0.01" value={edit.value}
+                          onChange={e => edit.setValue(e.target.value)}
+                          onKeyDown={edit.onKeyDown}
+                          onBlur={edit.onBlur}
+                          className="w-24 bg-elevated border border-accent-green/50 rounded px-2 py-0.5 text-sm text-white text-right focus:outline-none" />
+                      ) : (
+                        <span className={`${colorFor(row.key, val)} private`}>
+                          {format(val, row.key)}
+                          {editable && edit.isOverride(month, row.key) && (
+                            <span className="ml-1 inline-flex align-middle opacity-50"><IconPencil size={10} /></span>
+                          )}
+                        </span>
+                      )}
+                    </td>
+                  );
+                })}
+
+                <td className="sticky right-0 z-10 bg-surface px-4 py-2.5 text-right text-sm tabular-nums border-b border-l border-white/[0.06]">
+                  {(() => {
+                    const { total, avg } = agg[row.key] ?? { total: null, avg: null };
+                    const avgColor = row.key === 'remaining' && avg != null
+                      ? (avg >= 0 ? 'text-accent-green' : 'text-red-400')
+                      : 'text-secondary';
+
+                    if (row.agg === 'avg') {
+                      return <span className={`${avgColor} private`}>{format(avg, row.key)}</span>;
+                    }
+                    if (row.agg === 'total') {
+                      return <span className="text-secondary private">{format(total, row.key)}</span>;
+                    }
+                    return (
+                      <div>
+                        <div className="text-secondary private">{format(total, row.key)}</div>
+                        {avg != null && (
+                          <div className="text-[10px] text-muted private">{format(avg, row.key)}</div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 function MonthlyPage() {
@@ -150,6 +318,7 @@ function MonthlyPage() {
   const [clearConfirm, setClearConfirm] = useState(false);
   const [editCell, setEditCell]         = useState(null); // { month, field }
   const [editVal, setEditVal]           = useState('');
+  const [view, setView]                 = useState('amounts'); // amounts | percentages
   const escRef = useRef(false);
 
   const persist = useCallback((next) => { setCashflow(next); }, [setCashflow]);
@@ -261,48 +430,76 @@ function MonthlyPage() {
     saveEdit();
   };
 
+  // ── Aggregation helpers ───────────────────────────────────────────────────
+  const mean = (arr) => {
+    const n = arr.filter(v => v != null);
+    return n.length ? n.reduce((s, v) => s + v, 0) / n.length : null;
+  };
+  const total = (arr) => {
+    const n = arr.filter(v => v != null);
+    return n.length ? n.reduce((s, v) => s + v, 0) : null;
+  };
+
+  // Months an average is allowed to see, per row
+  const avgMonthsFor = useCallback((key) =>
+    AVG_EXCLUDED_EXEMPT.has(key)
+      ? allMonths
+      : allMonths.filter(m => !AVG_EXCLUDED.has(m)),
+  [allMonths]);
+
   // ── Summary stats ─────────────────────────────────────────────────────────
-  const AVG_FROM = '2026-04';
   const stats = useMemo(() => {
-    const recs    = Object.values(cashflow);
-    const recsFrm = Object.entries(cashflow).filter(([m]) => m >= AVG_FROM).map(([, r]) => r);
-    const nonNull = (arr) => arr.filter(v => v != null);
-    const avg = (arr) => { const n = nonNull(arr); return n.length ? n.reduce((s, v) => s + v, 0) / n.length : null; };
-    const sum = (arr) => nonNull(arr).reduce((s, v) => s + v, 0);
+    const amountAt = (m, key) =>
+      key === 'remaining' ? computeRemaining(cashflow[m]) : (cashflow[m]?.[key] ?? null);
+    const avgAmount = (key) => mean(avgMonthsFor(key).map(m => amountAt(m, key)));
+    const avgShare  = (key) => mean(avgMonthsFor(key).map(m => computeShare(cashflow[m], key)));
+
     return {
-      avgSalary:      avg(recs.map(r => r.salary)),
-      avgSavings:     avg(recsFrm.map(r => r.savings)),
-      avgInvestments: avg(recsFrm.map(r => r.investments)),
-      avgRemaining:   avg(recs.map(r => computeRemaining(r))),
-      totalSaved:     sum(recs.map(r => r.savings)),
-      totalInvested:  sum(recs.map(r => r.investments)),
+      avgSalary:      avgAmount('salary'),
+      avgSavings:     avgAmount('savings'),
+      avgInvestments: avgAmount('investments'),
+      avgRemaining:   avgAmount('remaining'),
+      // Totals deliberately span every month, March included
+      totalSaved:     total(allMonths.map(m => cashflow[m]?.savings ?? null)) ?? 0,
+      totalInvested:  total(allMonths.map(m => cashflow[m]?.investments ?? null)) ?? 0,
+      avgSalaryPct:      avgShare('salary'),
+      avgSavingsPct:     avgShare('savings'),
+      avgInvestmentsPct: avgShare('investments'),
+      avgRemainingPct:   avgShare('remaining'),
     };
-  }, [cashflow]);
+  }, [cashflow, allMonths, avgMonthsFor]);
 
   // ── Per-row agg values ────────────────────────────────────────────────────
-  const rowAgg = useMemo(() => {
+  const amountAgg = useMemo(() => {
     const out = {};
-    const avgFromMonths = allMonths.filter(m => m >= AVG_FROM);
+    const valAt = (m, key) =>
+      key === 'remaining' ? computeRemaining(cashflow[m]) : (cashflow[m]?.[key] ?? null);
     ROWS.forEach(row => {
-      const useAvgFrom = row.key === 'savings' || row.key === 'investments';
-      const avgMonths  = useAvgFrom ? avgFromMonths : allMonths;
-      const allVals = allMonths
-        .map(m => row.key === 'remaining' ? computeRemaining(cashflow[m]) : (cashflow[m]?.[row.key] ?? null))
-        .filter(v => v != null);
-      const avgVals = avgMonths
-        .map(m => row.key === 'remaining' ? computeRemaining(cashflow[m]) : (cashflow[m]?.[row.key] ?? null))
-        .filter(v => v != null);
-      const total = allVals.reduce((s, v) => s + v, 0);
-      out[row.key] = { total, avg: avgVals.length ? avgVals.reduce((s, v) => s + v, 0) / avgVals.length : null };
+      out[row.key] = {
+        total: total(allMonths.map(m => valAt(m, row.key))) ?? 0,
+        avg:   mean(avgMonthsFor(row.key).map(m => valAt(m, row.key))),
+      };
     });
     return out;
-  }, [cashflow, allMonths]);
+  }, [cashflow, allMonths, avgMonthsFor]);
+
+  const shareAgg = useMemo(() => {
+    const out = {};
+    PCT_ROWS.forEach(row => {
+      out[row.key] = {
+        total: null,
+        avg: mean(avgMonthsFor(row.key).map(m => computeShare(cashflow[m], row.key))),
+      };
+    });
+    return out;
+  }, [cashflow, allMonths, avgMonthsFor]);
 
   // ── Chart data ────────────────────────────────────────────────────────────
   const chartData = useMemo(() =>
     allMonths.map(month => {
       const r = cashflow[month];
       return {
+        key:           month,
         month:         toMonthShort(month),
         salary:        r?.salary        ?? 0,
         savings:       r?.savings       ?? 0,
@@ -311,15 +508,24 @@ function MonthlyPage() {
         subscriptions: r?.subscriptions ?? 0,
         otherWastes:   Math.max(0, r?.otherWastes ?? 0),
         remaining:     computeRemaining(r) ?? 0,
+        remainingPct:  computeShare(r, 'remaining') ?? 0,
       };
     }),
   [cashflow, allMonths]);
+
+  // The stacked breakdown drops the outlier month so the rest stays readable
+  const breakdownData = useMemo(
+    () => chartData.filter(d => !CHART_EXCLUDED.has(d.key)),
+    [chartData],
+  );
 
   // ── Cell helpers ──────────────────────────────────────────────────────────
   const getCellVal = (month, key) =>
     key === 'remaining'
       ? computeRemaining(cashflow[month])
       : (cashflow[month]?.[key] ?? null);
+
+  const getShareVal = (month, key) => computeShare(cashflow[month], key);
 
   const cellColor = (key, val) => {
     if (val == null) return 'text-muted';
@@ -328,14 +534,51 @@ function MonthlyPage() {
     return 'text-white';
   };
 
+  const shareColor = (key, val) => {
+    if (val == null) return 'text-muted';
+    const tone = PCT_TONE[key];
+    if (tone === 'good')  return 'text-accent-green';
+    if (tone === 'spend') return 'text-red-400';
+    return val >= 0 ? 'text-accent-green' : 'text-red-400';
+  };
+
   const isOverride = (month, f) => cashflow[month]?.overrides?.[f] === true;
+
+  const editApi = {
+    cell: editCell,
+    value: editVal,
+    setValue: setEditVal,
+    start: startEdit,
+    onKeyDown,
+    onBlur,
+    isOverride,
+  };
+
+  const isPct = view === 'percentages';
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="h-full overflow-y-auto custom-scrollbar">
       <div className="px-3 md:px-6 py-3 md:py-6 space-y-4 md:space-y-5">
 
-        <h2 className="text-lg md:text-xl font-bold text-white">Cashflow</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg md:text-xl font-bold text-white">Cashflow</h2>
+
+          {/* Amounts ⇄ share of income */}
+          <div className="flex gap-1 bg-white/[0.03] rounded-lg p-1 w-fit">
+            {[
+              { id: 'amounts',     label: 'Amounts'   },
+              { id: 'percentages', label: '% of income' },
+            ].map(({ id, label }) => (
+              <button key={id} onClick={() => setView(id)}
+                className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-sm font-medium transition-colors whitespace-nowrap ${
+                  view === id ? 'bg-accent-green/15 text-accent-green' : 'text-secondary hover:text-white'
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* ── Parse controls ─────────────────────────────────────────────── */}
         <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-4 flex flex-wrap items-center gap-2 md:gap-3">
@@ -392,150 +635,68 @@ function MonthlyPage() {
         </div>
 
         {/* ── Summary cards ──────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 md:gap-3">
-          {[
-            { label: 'Avg monthly salary',   value: stats.avgSalary,      color: 'text-white'       },
-            { label: 'Avg monthly savings',  value: stats.avgSavings,     color: 'text-accent-gold' },
-            { label: 'Avg monthly invested', value: stats.avgInvestments, color: 'text-purple-400'  },
-            {
-              label: 'Avg remaining',
-              value: stats.avgRemaining,
-              color: stats.avgRemaining != null && stats.avgRemaining >= 0 ? 'text-accent-green' : 'text-red-400',
-            },
-            { label: 'Total saved',     value: stats.totalSaved,     color: 'text-accent-gold' },
-            { label: 'Total invested',  value: stats.totalInvested,  color: 'text-purple-400'  },
-          ].map(({ label, value, color }) => (
+        <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-3 ${isPct ? 'md:grid-cols-4' : 'md:grid-cols-6'}`}>
+          {(isPct
+            ? [
+                { label: 'Avg salary share',    value: stats.avgSalaryPct,      color: 'text-accent-green' },
+                { label: 'Avg saved share',     value: stats.avgSavingsPct,     color: 'text-red-400'      },
+                { label: 'Avg invested share',  value: stats.avgInvestmentsPct, color: 'text-red-400'      },
+                {
+                  label: 'Avg remaining share',
+                  value: stats.avgRemainingPct,
+                  color: stats.avgRemainingPct != null && stats.avgRemainingPct >= 0 ? 'text-accent-green' : 'text-red-400',
+                },
+              ].map(c => ({ ...c, text: fmtPct(c.value) }))
+            : [
+                { label: 'Avg monthly salary',   value: stats.avgSalary,      color: 'text-white'       },
+                { label: 'Avg monthly savings',  value: stats.avgSavings,     color: 'text-accent-gold' },
+                { label: 'Avg monthly invested', value: stats.avgInvestments, color: 'text-purple-400'  },
+                {
+                  label: 'Avg remaining',
+                  value: stats.avgRemaining,
+                  color: stats.avgRemaining != null && stats.avgRemaining >= 0 ? 'text-accent-green' : 'text-red-400',
+                },
+                { label: 'Total saved',     value: stats.totalSaved,     color: 'text-accent-gold' },
+                { label: 'Total invested',  value: stats.totalInvested,  color: 'text-purple-400'  },
+              ].map(c => ({ ...c, text: c.value != null ? fmtEur(c.value) : '—' }))
+          ).map(({ label, text, color }) => (
             <div key={label} className="bg-surface border border-white/10 rounded-xl p-3 md:p-4 min-w-0">
               <p className="text-[10px] text-muted uppercase tracking-widest mb-1 leading-tight truncate">{label}</p>
-              <p className={`text-sm md:text-base font-bold tabular-nums private truncate ${color}`}>
-                {value != null ? fmtEur(value) : '—'}
-              </p>
+              <p className={`text-sm md:text-base font-bold tabular-nums private truncate ${color}`}>{text}</p>
             </div>
           ))}
         </div>
 
+        <p className="text-[11px] text-muted">
+          <span className="text-accent-gold">{toMonthShort('2026-03')}*</span> is left out of every average
+          (it was a month of one-off money moves) and out of the stacked breakdown chart, but still counts
+          towards Total saved and Total invested. Avg remaining does include it.
+        </p>
+
         {/* ── Table ──────────────────────────────────────────────────────── */}
         {allMonths.length > 0 ? (
-          <div className="bg-surface border border-white/10 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto custom-scrollbar">
-              <table
-                className="border-separate border-spacing-0"
-                style={{ minWidth: `${140 + allMonths.length * 110 + 110}px` }}
-              >
-                <thead>
-                  <tr>
-                    {/* Sticky label header */}
-                    <th className="sticky left-0 z-20 bg-elevated px-4 py-3 text-left text-[10px] text-muted uppercase tracking-widest font-medium border-b border-r border-white/[0.06]"
-                      style={{ width: 140, minWidth: 140 }}>
-                      Category
-                    </th>
-
-                    {/* Month headers */}
-                    {allMonths.map(month => (
-                      <th key={month}
-                        className="px-3 py-3 bg-surface text-center text-[10px] text-secondary uppercase tracking-widest font-medium border-b border-white/[0.06]"
-                        style={{ width: 110, minWidth: 110 }}>
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span>{toMonthShort(month)}</span>
-                          <button
-                            onClick={() => handleReparse(month)}
-                            title="Re-parse this month"
-                            className="text-muted hover:text-accent-green transition-colors flex-shrink-0"
-                          >
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="1 4 1 10 7 10"/>
-                              <path d="M3.51 15a9 9 0 1 0 .49-3.1"/>
-                            </svg>
-                          </button>
-                        </div>
-                      </th>
-                    ))}
-
-                    {/* Sticky agg header */}
-                    <th className="sticky right-0 z-20 bg-elevated px-4 py-3 text-right text-[10px] text-muted uppercase tracking-widest font-medium border-b border-l border-white/[0.06]"
-                      style={{ width: 110, minWidth: 110 }}>
-                      Avg / Total
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {ROWS.map(row => (
-                    <tr key={row.key} className="hover:bg-white/[0.015] transition-colors">
-
-                      {/* Sticky label */}
-                      <td className="sticky left-0 z-10 bg-surface px-4 py-2.5 text-sm font-medium text-secondary border-b border-r border-white/[0.06] whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ background: CLR[row.key] ?? '#7a95b2' }} />
-                          {row.label}
-                        </div>
-                      </td>
-
-                      {/* Month cells */}
-                      {allMonths.map(month => {
-                        const val = getCellVal(month, row.key);
-                        const isEditing = editCell?.month === month && editCell?.field === row.key;
-                        const overridden = row.editable && isOverride(month, row.key);
-
-                        return (
-                          <td
-                            key={month}
-                            className={`px-3 py-2.5 text-right text-sm tabular-nums border-b border-white/[0.04]
-                              ${row.editable ? 'cursor-pointer hover:bg-accent-green/[0.04]' : ''}`}
-                            onClick={() => { if (!row.editable || isEditing) return; startEdit(month, row.key, val); }}
-                          >
-                            {isEditing ? (
-                              <input
-                                autoFocus
-                                type="number"
-                                step="0.01"
-                                value={editVal}
-                                onChange={e => setEditVal(e.target.value)}
-                                onKeyDown={onKeyDown}
-                                onBlur={onBlur}
-                                className="w-24 bg-elevated border border-accent-green/50 rounded px-2 py-0.5 text-sm text-white text-right focus:outline-none"
-                              />
-                            ) : (
-                              <span className={`${cellColor(row.key, val)} private`}>
-                                {val != null ? fmtEur(val) : '—'}
-                                {overridden && <span className="ml-1 inline-flex align-middle opacity-50"><IconPencil size={10} /></span>}
-                              </span>
-                            )}
-                          </td>
-                        );
-                      })}
-
-                      {/* Sticky agg */}
-                      <td className="sticky right-0 z-10 bg-surface px-4 py-2.5 text-right text-sm tabular-nums border-b border-l border-white/[0.06]">
-                        {(() => {
-                          const { total, avg } = rowAgg[row.key] ?? { total: 0, avg: null };
-                          if (row.agg === 'avg') {
-                            const col = row.key === 'remaining' && avg != null
-                              ? (avg >= 0 ? 'text-accent-green' : 'text-red-400')
-                              : 'text-secondary';
-                            return <span className={`${col} private`}>{avg != null ? fmtEur(avg) : '—'}</span>;
-                          }
-                          if (row.agg === 'total') {
-                            return <span className="text-secondary private">{fmtEur(total)}</span>;
-                          }
-                          // total+avg
-                          return (
-                            <div>
-                              <div className="text-secondary private">{fmtEur(total)}</div>
-                              {avg != null && (
-                                <div className="text-[10px] text-muted private">{fmtEur(avg)}</div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          isPct ? (
+            <BreakdownTable
+              rows={PCT_ROWS}
+              months={allMonths}
+              getValue={getShareVal}
+              format={fmtPct}
+              colorFor={shareColor}
+              agg={shareAgg}
+              onReparse={handleReparse}
+            />
+          ) : (
+            <BreakdownTable
+              rows={ROWS}
+              months={allMonths}
+              getValue={getCellVal}
+              format={(v) => (v != null ? fmtEur(v) : '—')}
+              colorFor={cellColor}
+              agg={amountAgg}
+              onReparse={handleReparse}
+              edit={editApi}
+            />
+          )
         ) : (
           <div className="bg-surface border border-white/10 rounded-xl p-10 text-center text-muted text-sm">
             No data yet — select a month and click "Parse month" to get started.
@@ -548,9 +709,12 @@ function MonthlyPage() {
 
             {/* Chart 1: Stacked breakdown + salary line */}
             <div className="bg-surface border border-white/10 rounded-xl p-5">
-              <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">Monthly breakdown</h3>
+              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+                <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest">Monthly breakdown</h3>
+                <span className="text-[10px] text-muted">{toMonthShort('2026-03')} omitted — it dwarfs every other month</span>
+              </div>
               <ResponsiveContainer width="100%" height={260}>
-                <ComposedChart data={chartData}>
+                <ComposedChart data={breakdownData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: '#3d5a78', fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: '#3d5a78', fontSize: 11 }} axisLine={false} tickLine={false} width={65}
@@ -568,20 +732,23 @@ function MonthlyPage() {
               </ResponsiveContainer>
             </div>
 
-            {/* Chart 2: Remaining per month */}
+            {/* Chart 2: Remaining per month — amounts or share of income */}
             <div className="bg-surface border border-white/10 rounded-xl p-5">
-              <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">Remaining over time</h3>
+              <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-4">
+                Remaining over time{isPct && ' (% of income)'}
+              </h3>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
                   <XAxis dataKey="month" tick={{ fill: '#3d5a78', fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: '#3d5a78', fontSize: 11 }} axisLine={false} tickLine={false} width={65}
-                    tickFormatter={v => `€${v.toFixed(0)}`} />
-                  <Tooltip content={<ChartTooltip />} />
+                    tickFormatter={v => (isPct ? `${v.toFixed(0)}%` : `€${v.toFixed(0)}`)} />
+                  <Tooltip content={<ChartTooltip fmt={isPct ? fmtPct : fmtEur} />} />
                   <ReferenceLine y={0} stroke="rgba(255,255,255,0.25)" strokeWidth={1} />
-                  <Bar dataKey="remaining" name="Remaining" radius={[4, 4, 0, 0]}>
+                  <Bar dataKey={isPct ? 'remainingPct' : 'remaining'} name="Remaining" radius={[4, 4, 0, 0]}>
                     {chartData.map((entry, i) => (
-                      <Cell key={i} fill={entry.remaining >= 0 ? '#00c896' : '#ff5c5c'} />
+                      <Cell key={i}
+                        fill={(isPct ? entry.remainingPct : entry.remaining) >= 0 ? '#00c896' : '#ff5c5c'} />
                     ))}
                   </Bar>
                 </BarChart>
