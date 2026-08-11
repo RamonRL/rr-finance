@@ -17,11 +17,17 @@ const PERSONAL_ACCT = 1;
 const START_MONTH   = '2026-01';
 
 // March 2026 was a month of heavy one-off money moves. Its values still count
-// towards totals, but they distort every average badly enough to make them
-// useless, so averages skip it. Avg remaining is the exception — one outlier
-// month barely moves it, and dropping it there would hide a real result.
+// towards totals, but they distort most averages badly enough to make them
+// useless, so averages skip it. The exempt rows below were not distorted that
+// month — common and subscriptions ran at their usual level, and one outlier
+// barely moves remaining — so dropping March there would hide a real result.
 const AVG_EXCLUDED = new Set(['2026-03']);
-const AVG_EXCLUDED_EXEMPT = new Set(['remaining']);
+const AVG_EXCLUDED_EXEMPT = new Set(['common', 'subscriptions', 'remaining']);
+
+// A parsed month with nothing put aside is a real zero, not missing data, so it
+// has to pull these averages down. Months never parsed stay unknown and are
+// skipped instead — see readValue.
+const ZERO_FILLED = new Set(['savings', 'investments']);
 
 // Same month dwarfs every other bar in the stacked breakdown, flattening the
 // rest of the year into an unreadable strip.
@@ -33,9 +39,9 @@ const ROWS = [
   { key: 'salary',        label: 'Salary',        editable: true,  agg: 'avg'       },
   { key: 'savings',       label: 'Savings',        editable: true,  agg: 'total+avg' },
   { key: 'investments',   label: 'Investments',    editable: true,  agg: 'total+avg' },
-  { key: 'common',        label: 'Common',         editable: true,  agg: 'total'     },
-  { key: 'subscriptions', label: 'Subscriptions',  editable: true,  agg: 'total'     },
-  { key: 'otherWastes',   label: 'Other wastes',   editable: true,  agg: 'total'     },
+  { key: 'common',        label: 'Common',         editable: true,  agg: 'avg'       },
+  { key: 'subscriptions', label: 'Subscriptions',  editable: true,  agg: 'avg'       },
+  { key: 'otherWastes',   label: 'Other wastes',   editable: true,  agg: 'avg'       },
   { key: 'remaining',     label: 'Remaining',      editable: false, agg: 'avg'       },
 ];
 
@@ -165,11 +171,27 @@ function applyParsed(existing, parsed) {
   return next;
 }
 
+/**
+ * The single way to read one row's value for a month, so the cell, the average,
+ * the total, the share and the charts can never disagree.
+ *
+ * Returns null for genuinely unknown values — a month that was never parsed —
+ * and callers skip those. Rows in ZERO_FILLED read as 0 once the month has been
+ * parsed, since "nothing set aside" is a real result that should weigh on the
+ * average rather than vanish from it.
+ */
+export function readValue(rec, key) {
+  if (key === 'remaining') return computeRemaining(rec);
+  const val = rec?.[key] ?? null;
+  if (val == null && ZERO_FILLED.has(key)) return rec ? 0 : null;
+  return val;
+}
+
 /** Share of a month's income taken by one row. Null when income is unknown. */
 export function computeShare(rec, key) {
   const income = rec?.income;
   if (!income) return null;
-  const val = key === 'remaining' ? computeRemaining(rec) : rec?.[key];
+  const val = readValue(rec, key);
   return val == null ? null : (val / income) * 100;
 }
 
@@ -449,9 +471,7 @@ function MonthlyPage() {
 
   // ── Summary stats ─────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const amountAt = (m, key) =>
-      key === 'remaining' ? computeRemaining(cashflow[m]) : (cashflow[m]?.[key] ?? null);
-    const avgAmount = (key) => mean(avgMonthsFor(key).map(m => amountAt(m, key)));
+    const avgAmount = (key) => mean(avgMonthsFor(key).map(m => readValue(cashflow[m], key)));
     const avgShare  = (key) => mean(avgMonthsFor(key).map(m => computeShare(cashflow[m], key)));
 
     return {
@@ -460,8 +480,8 @@ function MonthlyPage() {
       avgInvestments: avgAmount('investments'),
       avgRemaining:   avgAmount('remaining'),
       // Totals deliberately span every month, March included
-      totalSaved:     total(allMonths.map(m => cashflow[m]?.savings ?? null)) ?? 0,
-      totalInvested:  total(allMonths.map(m => cashflow[m]?.investments ?? null)) ?? 0,
+      totalSaved:     total(allMonths.map(m => readValue(cashflow[m], 'savings'))) ?? 0,
+      totalInvested:  total(allMonths.map(m => readValue(cashflow[m], 'investments'))) ?? 0,
       avgSalaryPct:      avgShare('salary'),
       avgSavingsPct:     avgShare('savings'),
       avgInvestmentsPct: avgShare('investments'),
@@ -472,12 +492,10 @@ function MonthlyPage() {
   // ── Per-row agg values ────────────────────────────────────────────────────
   const amountAgg = useMemo(() => {
     const out = {};
-    const valAt = (m, key) =>
-      key === 'remaining' ? computeRemaining(cashflow[m]) : (cashflow[m]?.[key] ?? null);
     ROWS.forEach(row => {
       out[row.key] = {
-        total: total(allMonths.map(m => valAt(m, row.key))) ?? 0,
-        avg:   mean(avgMonthsFor(row.key).map(m => valAt(m, row.key))),
+        total: total(allMonths.map(m => readValue(cashflow[m], row.key))) ?? 0,
+        avg:   mean(avgMonthsFor(row.key).map(m => readValue(cashflow[m], row.key))),
       };
     });
     return out;
@@ -501,12 +519,12 @@ function MonthlyPage() {
       return {
         key:           month,
         month:         toMonthShort(month),
-        salary:        r?.salary        ?? 0,
-        savings:       r?.savings       ?? 0,
-        investments:   r?.investments   ?? 0,
-        common:        r?.common        ?? 0,
-        subscriptions: r?.subscriptions ?? 0,
-        otherWastes:   Math.max(0, r?.otherWastes ?? 0),
+        salary:        readValue(r, 'salary')        ?? 0,
+        savings:       readValue(r, 'savings')       ?? 0,
+        investments:   readValue(r, 'investments')   ?? 0,
+        common:        readValue(r, 'common')        ?? 0,
+        subscriptions: readValue(r, 'subscriptions') ?? 0,
+        otherWastes:   Math.max(0, readValue(r, 'otherWastes') ?? 0),
         remaining:     computeRemaining(r) ?? 0,
         remainingPct:  computeShare(r, 'remaining') ?? 0,
       };
@@ -520,10 +538,7 @@ function MonthlyPage() {
   );
 
   // ── Cell helpers ──────────────────────────────────────────────────────────
-  const getCellVal = (month, key) =>
-    key === 'remaining'
-      ? computeRemaining(cashflow[month])
-      : (cashflow[month]?.[key] ?? null);
+  const getCellVal = (month, key) => readValue(cashflow[month], key);
 
   const getShareVal = (month, key) => computeShare(cashflow[month], key);
 
@@ -668,9 +683,10 @@ function MonthlyPage() {
         </div>
 
         <p className="text-[11px] text-muted">
-          <span className="text-accent-gold">{toMonthShort('2026-03')}*</span> is left out of every average
-          (it was a month of one-off money moves) and out of the stacked breakdown chart, but still counts
-          towards Total saved and Total invested. Avg remaining does include it.
+          <span className="text-accent-gold">{toMonthShort('2026-03')}*</span> was a month of one-off money
+          moves, so it is left out of the averages for salary, savings, investments and other wastes, and out
+          of the stacked breakdown chart. It still counts towards Total saved and Total invested, and towards
+          the averages for common, subscriptions and remaining, which it did not distort.
         </p>
 
         {/* ── Table ──────────────────────────────────────────────────────── */}
