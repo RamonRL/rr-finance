@@ -1,5 +1,7 @@
+import io
 import os
 import json
+import re
 import secrets
 import contextlib
 from contextlib import asynccontextmanager
@@ -8,8 +10,9 @@ from typing import Any, Optional
 from collections import defaultdict
 
 import jwt
+import xlrd
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -678,6 +681,325 @@ def get_investments_summary():
             {"label": k, "invested": v}
             for k, v in monthly.items()
         ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Bank statement import (Banco Sabadell "Consulta de movimientos" .xls export)
+#
+# The export is a real BIFF .xls: a few metadata rows, a header row, then one
+# row per movement ordered newest-first. Only "F. Operativa" (date), "Concepto"
+# (description) and "Importe" (signed amount) are used.
+# ---------------------------------------------------------------------------
+
+_HEADER_DATE = "f. operativa"
+_HEADER_CONCEPT = "concepto"
+_HEADER_AMOUNT = "importe"
+
+# Sabadell prefixes every card purchase with "COMPRA TARJ. <masked pan> ", and
+# refunds with "ANUL COMPRA TARJ. <pan> " / "DEVOLUCION TAR.<pan> <dd.mm> ".
+_CARD_RE = re.compile(r"^COMPRA\s+TARJ\.\s+\S+\s+(?P<rest>.+)$", re.I)
+_REVERSAL_RE = re.compile(r"^ANUL\.?\s+(?P<rest>.+)$", re.I)
+_REFUND_RE = re.compile(r"^DEVOLUCION\s+TAR\.\S+\s+(?:\d{1,2}\.\d{1,2}\s+)?(?P<rest>.+)$", re.I)
+
+# Merchant/concept rules: (pattern, clean description or None to keep the
+# merchant name, category). First match wins, so specific entries go first.
+_RULES: list[tuple[str, Optional[str], str]] = [
+    # Subscriptions & online services
+    (r"ANTHROPIC",                  "Anthropic (Claude)",      "Subscriptions"),
+    (r"OPENAI",                     "OpenAI (ChatGPT)",        "Subscriptions"),
+    (r"ELEVENLABS",                 "ElevenLabs",              "Subscriptions"),
+    (r"SUPABASE",                   "Supabase",                "Subscriptions"),
+    (r"VERCEL",                     "Vercel",                  "Subscriptions"),
+    (r"OVH",                        "OVHcloud",                "Subscriptions"),
+    (r"RESEND",                     "Resend",                  "Subscriptions"),
+    (r"RUNWAY",                     "Runway",                  "Subscriptions"),
+    (r"API-SPORTS",                 "API-Sports",              "Subscriptions"),
+    (r"PADDLE",                     "Paddle",                  "Subscriptions"),
+    (r"GOOGLE\s*\*?\s*ADS",         "Google Ads",              "Subscriptions"),
+    (r"GOOGLE\s*\*?\s*Google One",  "Google One",              "Subscriptions"),
+    (r"APPLE\.COM/BILL|APPLE",      "Apple",                   "Subscriptions"),
+    (r"NETFLIX|SPOTIFY|HBO|DISNEY", None,                      "Subscriptions"),
+    (r"X CORP",                     "X (Twitter)",             "Subscriptions"),
+    # Shopping
+    (r"(WWW\.)?AMAZON",             "Amazon",                  "Shopping"),
+    (r"DECATHLON",                  "Decathlon",               "Shopping"),
+    (r"MYPROTEIN",                  "MyProtein",               "Shopping"),
+    (r"\bZARA\b|\bFNAC\b|CORTE INGLES|PRIMARK|\bIKEA\b", None, "Shopping"),
+    (r"BAZAR|\bNORMAL\b|LUDOVICUS|FOTO ROMAN",  None,          "Shopping"),
+    # Food & groceries
+    (r"\bDIA\s*\d*",                "Dia",                     "Food & Groceries"),
+    (r"\bLIDL\b",                   "Lidl",                    "Food & Groceries"),
+    (r"MERCADONA",                  "Mercadona",               "Food & Groceries"),
+    (r"CARREFOUR",                  "Carrefour",               "Food & Groceries"),
+    (r"CONDIS|BONPREU|EROSKI|CAPRABO|ALDI", None,              "Food & Groceries"),
+    (r"CHARTER",                    "Charter",                 "Food & Groceries"),
+    (r"LA SIRENA|SUPERMERCAT|SUPERMERCADO", None,              "Food & Groceries"),
+    (r"JUST EAT",                   "Just Eat",                "Food & Groceries"),
+    (r"GLOVO|UBER EATS",            None,                      "Food & Groceries"),
+    (r"VENDING",                    "Vending machine",         "Food & Groceries"),
+    (r"RESTAURANT|PIZZ|BURGER|CAFE|CAFETERIA|TAPAS|HELAD|SUSHI|CREP|BRASA",
+                                    None,                      "Food & Groceries"),
+    (r"^BAR\b|\bBAR\b|FRANKFURT|QUIOSC|FABORIT|PANADERIA|FORN", None, "Food & Groceries"),
+    # Travel & transport
+    (r"VUELING",                    "Vueling",                 "Travel"),
+    (r"RYANAIR|IBERIA|EASYJET",     None,                      "Travel"),
+    (r"BOOKING\.COM",               "Booking.com",             "Travel"),
+    (r"AIRBNB",                     "Airbnb",                  "Travel"),
+    (r"CABANES|HOTEL|HOSTAL|CAMPING", None,                    "Travel"),
+    (r"RENFE|\bTMB\b|METRO\b|\bFGC\b", None,                   "Transport"),
+    (r"AUTOBUS|AUTOB[ÚU]S",         None,                      "Transport"),
+    (r"APARC|PARKING|SABA\b|PRAT ESPAIS", None,                "Transport"),
+    (r"MIDAS|TALLER|ITV\b",         None,                      "Transport"),
+    (r"^E\.S\.|AYAFUEL|REPSOL|CEPSA|GALP|MEROIL|\bOIL\b|PETROL", None, "Fuel"),
+    # Leisure & health
+    (r"KINEPOLIS|CINESA|YELMO",     None,                      "Entertainment"),
+    (r"PLAYTOMIC",                  "Playtomic",               "Entertainment"),
+    (r"FIRA |CIRCUIT|OCIO|CHAMPIONS", None,                    "Entertainment"),
+    (r"\bONCE\b|DAZNBET|\bBWIN\b|CODERE|BET365|LOTERIA", None, "Gambling"),
+    (r"BASIC-?FIT|\bGYM\b|DIR\b",   None,                      "Health"),
+    (r"FARMACIA|CLINICA|DENTAL|HOSPITAL", None,                "Health"),
+    # Utilities & housing
+    (r"ORANGE",                     "Orange Móvil",            "Utilities"),
+    (r"VODAFONE|MOVISTAR|JAZZTEL|YOIGO|DIGI\b", None,          "Utilities"),
+    (r"ENDESA|IBERDROLA|NATURGY|AGBAR|SERVEIS AMBIENTALS", None, "Utilities"),
+    (r"AJUNTAMENT|AYUNTAMIENTO|IBI\b|SUMA\b", None,            "Housing"),
+]
+
+_COMPILED_RULES = [(re.compile(p, re.I), desc, cat) for p, desc, cat in _RULES]
+
+# Words the bank shouts that should stay uppercase / lowercase when prettified.
+_ACRONYMS = {
+    "SL", "SLU", "SA", "SAU", "SCP", "SCCL", "AB", "BV", "NV", "GMBH", "LTD",
+    "INC", "LLC", "IRPF", "IVA", "ONCE", "IT", "IBI", "ITV", "TMB", "FGC",
+    "USA", "UK", "DNI", "NIF", "ATM", "PIN", "CIF", "OIL", "ES",
+}
+_LOWER_WORDS = {
+    "de", "del", "la", "las", "el", "los", "y", "o", "a", "en", "por", "para",
+    "con", "sin", "al", "i", "d", "no", "da", "dos", "das",
+}
+
+
+def _prettify(raw: str) -> str:
+    """Turn a SHOUTED bank concept into something readable."""
+    cleaned = re.sub(r"\s+", " ", raw).strip(" .,-")
+    if not cleaned:
+        return raw.strip()
+    # Leave names the bank already sent in mixed case alone.
+    if not cleaned.isupper():
+        return cleaned
+
+    def cap(word: str) -> str:
+        # Capitalise each hyphen-separated part: 'ENSENYAMENT-MUSICAL' -> 'Ensenyament-Musical'
+        return "-".join(p.capitalize() for p in word.split("-"))
+
+    words = []
+    for i, w in enumerate(cleaned.split()):
+        bare = w.replace(".", "").strip(",;:()").upper()
+        if bare in _ACRONYMS:
+            words.append(w.upper())
+        elif w.lower() in _LOWER_WORDS and i > 0:
+            words.append(w.lower())
+        elif any(ch.isdigit() for ch in w):
+            words.append(w.upper())
+        else:
+            words.append(cap(w))
+    return " ".join(words)
+
+
+def _strip_city(merchant: str) -> str:
+    """'DIA 35019-CORNELLA DE L' -> 'DIA 35019'. The city is the last segment."""
+    if "-" not in merchant:
+        return merchant.strip()
+    head, _, tail = merchant.rpartition("-")
+    head, tail = head.strip(), tail.strip()
+    if not head:
+        return merchant.strip()
+    # A trailing city looks like words (optionally with a small district number),
+    # or is a pure numeric reference the bank tacked on.
+    if tail.isdigit() or re.fullmatch(r"[A-Za-zÀ-ÿ'\.\s]{3,}\s?\d{0,3}", tail):
+        return head
+    return merchant.strip()
+
+
+def _match_rules(text: str, fallback: str, strip_city: bool = False) -> Optional[tuple[str, str]]:
+    """Find the first rule matching `text`. `strip_city` only applies to card
+    purchases, where Sabadell uses a 'MERCHANT-CITY' convention; other concepts
+    may legitimately contain a hyphen (e.g. 'AJUNTAMENT X-ENSENYAMENT MUSICAL')."""
+    for rx, desc, cat in _COMPILED_RULES:
+        if rx.search(text):
+            name = _strip_city(fallback) if strip_city else fallback
+            return desc or _prettify(name), cat
+    return None
+
+
+def _classify(concept: str, amount: float) -> tuple[str, Optional[str], bool]:
+    """Map a raw bank concept to (description, category, matched_a_rule)."""
+    text = re.sub(r"\s+", " ", concept).strip()
+
+    # Reversals and refunds keep the merchant but flip to income
+    m = _REVERSAL_RE.match(text) or _REFUND_RE.match(text)
+    if m:
+        inner_desc, _, _ = _classify(m.group("rest"), -1.0)
+        return f"Refund — {inner_desc}", "Refund", True
+
+    # Bizum
+    m = re.match(r"^ABONO BIZUM DE\s+(?P<who>.+)$", text, re.I)
+    if m:
+        return f"Bizum de {_prettify(m.group('who'))}", "Bizum", True
+    m = re.match(r"^PAGO BIZUM\s+(?P<who>.+)$", text, re.I)
+    if m:
+        return f"Bizum a {_prettify(m.group('who'))}", "Bizum", True
+
+    # Payroll
+    m = re.match(r"^NOMINA(?:\s+DE)?\s+(?P<who>.+)$", text, re.I)
+    if m:
+        return f"Nómina {_prettify(m.group('who'))}", "Salary", True
+
+    # Transfers — no category, since only you know what the transfer was for
+    m = re.match(r"^ABONO TRANSFERENCIA DE\s+(?P<who>.+)$", text, re.I)
+    if m:
+        return f"Transferencia de {_prettify(m.group('who'))}", None, False
+    m = re.match(r"^(?:TRANSFERENCIA|TRASPASO) A\s+(?P<who>.+)$", text, re.I)
+    if m:
+        return f"Transferencia a {_prettify(m.group('who'))}", None, False
+
+    # Direct debits
+    m = re.match(r"^ADEUDO RECIBO\s+(?P<who>.+)$", text, re.I)
+    if m:
+        who = m.group("who")
+        hit = _match_rules(who, who)
+        return hit + (True,) if hit else (_prettify(who), "Subscriptions", True)
+
+    # Bank fees / interest / taxes
+    if re.match(r"^COMISI[ÓO]N|^INTERESES", text, re.I):
+        return _prettify(text), "Other", True
+    if re.match(r"^BONIFIC", text, re.I):
+        return _prettify(text), "Refund", True
+    m = re.match(r"^IMPUESTOS\s*-?\s*(?P<what>.+)$", text, re.I)
+    if m:
+        what = m.group("what")
+        hit = _match_rules(what, what)
+        return hit + (True,) if hit else (_prettify(what), "Other", True)
+    if re.match(r"^TELEFONOS\s+", text, re.I):
+        hit = _match_rules(text, text)
+        return hit + (True,) if hit else (_prettify(text), "Utilities", True)
+
+    # Card purchases — here the trailing '-CITY' really is a city
+    m = _CARD_RE.match(text)
+    merchant = m.group("rest") if m else text
+    hit = _match_rules(merchant, merchant, strip_city=True)
+    if hit:
+        return hit + (True,)
+
+    return _prettify(_strip_city(merchant)), None, False
+
+
+def _parse_statement(data: bytes) -> list[dict]:
+    try:
+        book = xlrd.open_workbook(file_contents=data)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not read the .xls file: {exc}")
+
+    sheet = book.sheet_by_index(0)
+
+    # Locate the header row instead of hardcoding its index — Sabadell shifts it
+    # depending on how many metadata lines the export carries.
+    header_row = None
+    cols: dict[str, int] = {}
+    for r in range(min(sheet.nrows, 40)):
+        labels = {
+            str(sheet.cell(r, c).value).strip().lower(): c
+            for c in range(sheet.ncols)
+            if str(sheet.cell(r, c).value).strip()
+        }
+        if _HEADER_DATE in labels and _HEADER_CONCEPT in labels and _HEADER_AMOUNT in labels:
+            header_row = r
+            cols = labels
+            break
+
+    if header_row is None:
+        raise HTTPException(
+            status_code=400,
+            detail='Header row not found — expected columns "F. Operativa", "Concepto" and "Importe".',
+        )
+
+    date_col, concept_col, amount_col = cols[_HEADER_DATE], cols[_HEADER_CONCEPT], cols[_HEADER_AMOUNT]
+
+    rows = []
+    for r in range(header_row + 1, sheet.nrows):
+        raw_date = sheet.cell(r, date_col).value
+        raw_concept = str(sheet.cell(r, concept_col).value).strip()
+        raw_amount = sheet.cell(r, amount_col).value
+
+        if raw_amount == "" or raw_amount is None or not raw_concept:
+            continue
+
+        # Dates come through as dd/mm/yyyy text, but tolerate real Excel dates
+        if isinstance(raw_date, float):
+            try:
+                y, mo, d, *_ = xlrd.xldate_as_tuple(raw_date, book.datemode)
+                op_date = date(y, mo, d)
+            except Exception:
+                continue
+        else:
+            m = re.match(r"^\s*(\d{1,2})[/-](\d{1,2})[/-](\d{4})", str(raw_date))
+            if not m:
+                continue
+            op_date = date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+
+        try:
+            amount = float(raw_amount)
+        except (TypeError, ValueError):
+            continue
+        if amount == 0:
+            continue
+
+        description, category, matched = _classify(raw_concept, amount)
+        rows.append({
+            "date": op_date.isoformat(),
+            "raw_description": raw_concept,
+            "description": description,
+            "amount": round(abs(amount), 2),
+            "type": "income" if amount > 0 else "expense",
+            "category": category,
+            "auto": matched,
+        })
+
+    # The export is newest-first; review runs oldest-first.
+    rows.sort(key=lambda x: x["date"])
+    return rows
+
+
+@app.post("/import/statement")
+async def import_statement(
+    file: UploadFile = File(...),
+    account_id: int = Query(1),
+):
+    """Parse a Sabadell .xls statement into reviewable rows. Writes nothing."""
+    if not file.filename.lower().endswith((".xls", ".xlsx")):
+        raise HTTPException(status_code=400, detail="Expected an .xls file exported from Sabadell")
+
+    rows = _parse_statement(await file.read())
+
+    # Flag rows that look like they were already imported, so a re-upload after
+    # stopping halfway can skip what is already in the history.
+    with Session(engine) as session:
+        existing = session.exec(select(Transaction)).all()
+    seen = {
+        (t.date.isoformat(), round(t.amount, 2), t.type)
+        for t in existing
+        if t.account_id == account_id
+    }
+    for row in rows:
+        row["duplicate"] = (row["date"], row["amount"], row["type"]) in seen
+
+    return {
+        "count": len(rows),
+        "duplicates": sum(1 for r in rows if r["duplicate"]),
+        "from": rows[0]["date"] if rows else None,
+        "to": rows[-1]["date"] if rows else None,
+        "rows": rows,
     }
 
 

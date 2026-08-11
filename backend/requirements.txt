@@ -5,3 +5,5 @@ python-dateutil
 psycopg2-binary
 python-dotenv
 PyJWT
+xlrd
+python-multipart

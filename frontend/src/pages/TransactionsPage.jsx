@@ -11,6 +11,7 @@ import {
   IconPencil,
   IconTrash,
 } from '../components/icons';
+import ImportStatementModal from '../components/ImportStatementModal';
 
 const now = new Date();
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -57,6 +58,7 @@ export default function TransactionsPage() {
   const [mobileFormOpen, setMobileFormOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [showImport, setShowImport] = useState(false);
 
   const categories = form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
   const otherAccounts = accounts.filter(a => a.id !== selectedAccount?.id);
@@ -306,6 +308,14 @@ export default function TransactionsPage() {
             </div>
           )}
         </div>
+
+        {/* Import bank statement */}
+        <div className={`${mobileFormOpen ? 'block' : 'hidden'} md:block`}>
+          <button onClick={() => setShowImport(true)} disabled={!selectedAccount}
+            className="w-full bg-accent-blue/15 hover:bg-accent-blue/25 text-accent-blue text-sm font-semibold px-4 py-2 rounded-lg transition-colors border border-accent-blue/30 flex items-center justify-center gap-2 disabled:opacity-40">
+            <IconPlus size={16} /> Import statement
+          </button>
+        </div>
       </div>
 
       {/* RIGHT COLUMN — history */}
@@ -459,6 +469,22 @@ export default function TransactionsPage() {
           )}
         </div>
       </div>
+
+      {showImport && selectedAccount && (
+        <ImportStatementModal
+          accountId={selectedAccount.id}
+          accountName={selectedAccount.name}
+          onSaved={fetchTransactions}
+          onClose={() => {
+            setShowImport(false);
+            fetchTransactions();
+            fetch(`${API_URL}/available-months?account_id=${selectedAccount.id}`)
+              .then(r => r.ok ? r.json() : [])
+              .then(data => { if (Array.isArray(data)) setAvailableMonths(data); })
+              .catch(() => {});
+          }}
+        />
+      )}
 
     </div>
   );
