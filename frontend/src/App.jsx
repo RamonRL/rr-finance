@@ -370,7 +370,7 @@ function AppContent({ onLogout }) {
         <Route path="/" element={<HomePage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/savings" element={<SavingsPage />} />
+        <Route path="/savings/*" element={<SavingsPage />} />
         <Route path="/investments/*" element={<InvestmentsPage />} />
         <Route path="/cashflow/*" element={<CashflowPage />} />
         <Route path="/admin" element={<AdminPage />} />
