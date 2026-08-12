@@ -1,10 +1,10 @@
 import { Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import SavingsDepositsPage from './SavingsDepositsPage';
-import SavingsFundPage from './SavingsFundPage';
+import SavingsPortfolioPage from './SavingsPortfolioPage';
 
 const SUB_PAGES = [
-  { to: '/savings/deposits', label: 'Deposits' },
-  { to: '/savings/fund',     label: 'Money fund' },
+  { to: '/savings/deposits',  label: 'Deposits'  },
+  { to: '/savings/portfolio', label: 'Portfolio' },
 ];
 
 const SavingsPage = () => (
@@ -35,8 +35,10 @@ const SavingsPage = () => (
     <div className="flex-1 md:min-h-0">
       <Routes>
         <Route index element={<Navigate to="deposits" replace />} />
-        <Route path="deposits" element={<SavingsDepositsPage />} />
-        <Route path="fund"     element={<SavingsFundPage />} />
+        <Route path="deposits"  element={<SavingsDepositsPage />} />
+        <Route path="portfolio" element={<SavingsPortfolioPage />} />
+        {/* The tab used to be "Money fund" — keep old links working */}
+        <Route path="fund" element={<Navigate to="../portfolio" replace />} />
       </Routes>
     </div>
 
