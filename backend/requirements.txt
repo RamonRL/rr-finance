@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 sqlmodel
+sqlalchemy<2.1  # 2.1 defaults postgresql:// to psycopg3, we ship psycopg2
 python-dateutil
 psycopg2-binary
 python-dotenv
