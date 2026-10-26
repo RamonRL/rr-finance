@@ -79,6 +79,7 @@ INVESTMENT_TYPES = ["Fund", "ETF", "Stock", "Pension", "Crypto", "Other"]
 DEFAULT_ACCOUNTS = [
     {"id": 1, "name": "Personal", "icon": "user", "color": "#22c55e"},
     {"id": 3, "name": "Savings",  "icon": "bank", "color": "#f59e0b"},
+    {"id": 4, "name": "Investments", "icon": "card", "color": "#3d9eff"},
 ]
 
 
@@ -164,10 +165,11 @@ def create_db():
 
     # --- Phase 3: Seed default accounts ---
     with Session(engine) as session:
-        if not session.exec(select(Account)).first():
-            for acc_data in DEFAULT_ACCOUNTS:
+        existing = {a.id for a in session.exec(select(Account)).all()}
+        for acc_data in DEFAULT_ACCOUNTS:
+            if acc_data["id"] not in existing:
                 session.add(Account(**acc_data))
-            session.commit()
+        session.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -1075,6 +1077,68 @@ def put_store_value(key: str, body: StoreBody):
         session.add(row)
         session.commit()
         return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# AI assistant (stock / ETF picks)
+# ---------------------------------------------------------------------------
+
+AI_MODEL = os.getenv("AI_MODEL", "claude-sonnet-5-5")
+AI_SYSTEM = (
+    "Eres un asistente de inversión para un inversor particular español con horizonte largo. "
+    "Su cartera es 100% renta variable: núcleo en fondos indexados, oro y BTC, más una cesta "
+    "experimental de acciones/ETFs (máx. 3-4% del patrimonio) en Trade Republic. "
+    "Ayuda a analizar y proponer ideas con tesis clara, riesgos, valoración y encaje en la "
+    "cartera (diversificación, solapamiento con lo que ya tiene, tope de la cesta). "
+    "Sé concreto y honesto sobre la incertidumbre; no prometas rentabilidades. "
+    "Esto es apoyo a la decisión, no asesoramiento financiero regulado. Responde en español."
+)
+_AI_CALLS: list[float] = []  # ponytail: in-memory, single process; use Redis if scaled out
+_AI_LIMIT_PER_HOUR = 30
+
+
+class AiMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class AiChatBody(BaseModel):
+    messages: list[AiMessage]
+    context: str = ""  # portfolio / watchlist snapshot built by the frontend
+    search: bool = False
+
+
+@app.post("/ai/chat")
+def ai_chat(body: AiChatBody):
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY is not configured")
+    if not body.messages or body.messages[-1].role != "user":
+        raise HTTPException(status_code=400, detail="Last message must come from the user")
+
+    import time
+    now = time.time()
+    _AI_CALLS[:] = [t for t in _AI_CALLS if now - t < 3600]
+    if len(_AI_CALLS) >= _AI_LIMIT_PER_HOUR:
+        raise HTTPException(status_code=429, detail="AI request limit reached, try again later")
+    _AI_CALLS.append(now)
+
+    import anthropic
+    system = AI_SYSTEM + (f"\n\nContexto actual:\n{body.context[:20000]}" if body.context else "")
+    kwargs: dict[str, Any] = {}
+    if body.search:
+        kwargs["tools"] = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}]
+    try:
+        resp = anthropic.Anthropic(api_key=api_key).messages.create(
+            model=AI_MODEL,
+            max_tokens=2000,
+            system=system,
+            messages=[m.model_dump() for m in body.messages[-20:]],
+            **kwargs,
+        )
+    except anthropic.APIError as e:
+        raise HTTPException(status_code=502, detail=f"Anthropic API error: {e}")
+    return {"reply": "".join(b.text for b in resp.content if b.type == "text")}
 
 
 if __name__ == "__main__":

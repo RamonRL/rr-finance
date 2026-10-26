@@ -10,13 +10,14 @@ import { IconClose, IconPlus, IconCheck, IconPencil, IconTrash } from '../compon
 const EVO_KEY = 'rr-finance-evolution-data';
 const START_MONTH = '2026-02';
 
-const DCA_TYPES = ['Indexed Fund', 'ETF', 'Crypto', 'Gold', 'Other'];
+const DCA_TYPES = ['Indexed Fund', 'ETF', 'Crypto', 'Gold', 'Stock', 'Other'];
 
 const TYPE_COLORS = {
   'Indexed Fund': '#6366f1',
   'ETF':          '#00c896',
   'Crypto':       '#f97316',
   'Gold':         '#f0b429',
+  'Stock':        '#ec4899',
   'Other':        '#7a95b2',
 };
 

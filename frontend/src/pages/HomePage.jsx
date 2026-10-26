@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { API_URL } from '../constants';
 import { useAccount } from '../AccountContext';
 import { useStore } from '../hooks/useStore';
+import { buildHoldings, shareBy, START_MONTH } from '../utils/holdings';
+import { xirr } from '../utils/portfolio';
 import {
   AccountIcon,
   IconTrendUp,
@@ -23,13 +25,15 @@ const TOP_BAR_COLORS = ['#00c896', '#3d9eff', '#3d9eff', '#f0b429', '#f0b429'];
 // ── Investments (backend store) ───────────────────────────────────────────────
 const DCA_KEY = 'rr-finance-dca-contributions';
 const EVO_KEY = 'rr-finance-evolution-data';
-const START_MONTH = '2026-02';
+const SNAPSHOTS_KEY = 'rr-networth-snapshots';
+const round2 = (v) => Math.round(v * 100) / 100;
 
 const TYPE_COLORS = {
   'Indexed Fund': '#6366f1',
   ETF: '#00c896',
   Crypto: '#f97316',
   Gold: '#f0b429',
+  Stock: '#ec4899',
   Other: '#7a95b2',
 };
 
@@ -77,8 +81,9 @@ const HomePage = () => {
   const [monthsRange, setMonthsRange] = useState(6);
 
   // Investments — read from backend store (same source as EvolutionPage)
-  const [contributions] = useStore(DCA_KEY, []);
-  const [evData] = useStore(EVO_KEY, {});
+  const [contributions, , contribLoading] = useStore(DCA_KEY, []);
+  const [evData, , evLoading] = useStore(EVO_KEY, {});
+  const [snaps, setSnaps, snapsLoading] = useStore(SNAPSHOTS_KEY, []);
 
   useEffect(() => {
     if (!selectedAccount) return;
@@ -110,65 +115,9 @@ const HomePage = () => {
       .catch(() => {});
   }, []);
 
-  // ── Portfolio computation (mirrors EvolutionPage logic) ───────────────────
-  const dcaByAsset = useMemo(() => {
-    const map = {};
-    contributions.filter(c => c.month >= START_MONTH).forEach(c => {
-      if (!map[c.assetName]) {
-        map[c.assetName] = {
-          assetName: c.assetName, ticker: c.ticker,
-          type: c.type, broker: c.broker, months: {}, participations: {},
-        };
-      }
-      const a = map[c.assetName];
-      a.months[c.month] = (a.months[c.month] || 0) + c.amount;
-      a.participations[c.month] = (a.participations[c.month] || 0) + (c.participations || 0);
-      if (c.ticker) a.ticker = c.ticker;
-      a.type = c.type;
-      if (c.broker) a.broker = c.broker;
-    });
-    return map;
-  }, [contributions]);
-
-  const allMonths = useMemo(() =>
-    [...new Set(contributions.filter(c => c.month >= START_MONTH).map(c => c.month))].sort(),
-  [contributions]);
-
-  const assetNames = useMemo(() => Object.keys(dcaByAsset), [dcaByAsset]);
-
-  // Plain function (no useCallback needed — not passed as prop)
-  const getPrice = (assetName, month) => {
-    const ev = evData[`${assetName}___${month}`];
-    if (ev?.priceIsManual && ev.priceSource !== 'refresh' && ev.price != null) return ev.price;
-    const n = dcaByAsset[assetName]?.participations?.[month] || 0;
-    const dcaAmt = dcaByAsset[assetName]?.months[month];
-    if (n > 0 && dcaAmt != null) return dcaAmt / n;
-    if (ev?.price != null) return ev.price;
-    return null;
-  };
-
-  const assetRows = useMemo(() => {
-    return assetNames.map(name => {
-      const meta = dcaByAsset[name];
-      let totalN = 0, lastMonthPrice = null, totalContributed = 0;
-      allMonths.forEach(m => {
-        totalN += dcaByAsset[name]?.participations?.[m] || 0;
-        const p = getPrice(name, m);
-        if (p != null) lastMonthPrice = p;
-        totalContributed += meta.months[m] || 0;
-      });
-      const currentOverride = evData[`${name}___current`]?.price;
-      const latestPrice = currentOverride != null ? currentOverride : lastMonthPrice;
-      const totalEur = totalN * (latestPrice ?? 0);
-      const pnlEur = totalEur - totalContributed;
-      const pnlPct = totalContributed > 0 ? (pnlEur / totalContributed) * 100 : null;
-      return { name, meta, totalN, latestPrice, totalContributed, totalEur, pnlEur, pnlPct };
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetNames, dcaByAsset, allMonths, evData]);
-
-  const grandTotalEur = useMemo(() => assetRows.reduce((s, r) => s + r.totalEur, 0), [assetRows]);
-  const grandContributed = useMemo(() => assetRows.reduce((s, r) => s + r.totalContributed, 0), [assetRows]);
+  // ── Portfolio computation ─────────────────────────────────────────────────
+  const { assetRows, grandTotalEur, grandContributed } = useMemo(
+    () => buildHoldings(contributions, evData), [contributions, evData]);
   const grandPnlEur = grandTotalEur - grandContributed;
   const grandPnlPct = grandContributed > 0 ? (grandPnlEur / grandContributed) * 100 : null;
   const hasPortfolio = assetRows.some(r => r.totalEur > 0 || r.totalContributed > 0);
@@ -178,8 +127,46 @@ const HomePage = () => {
     [...assetRows].sort((a, b) => b.totalEur - a.totalEur).slice(0, 5),
   [assetRows]);
 
-  const totalBankBalance = balances.reduce((s, a) => s + a.balance, 0);
+  // Investments is only the ledger sink for money sent to the portfolio; its market
+  // value is already in grandTotalEur, so counting the account would double it.
+  const totalBankBalance = balances.filter(a => a.name !== 'Investments').reduce((s, a) => s + a.balance, 0);
   const grandTotal = totalBankBalance + grandTotalEur;
+
+  // Liquidity / emergency fund / invested split of the net worth
+  const bankAccounts = balances.filter(a => a.name !== 'Investments');
+  const emergency = balances.find(a => a.name === 'Savings')?.balance ?? 0;
+  const liquidity = totalBankBalance - emergency;
+  const split = [
+    { label: 'Liquidity', value: liquidity, color: '#00c896' },
+    { label: 'Emergency fund', value: emergency, color: '#f0b429' },
+    { label: 'Invested', value: grandTotalEur, color: '#6366f1' },
+  ];
+
+  const brokerShare = useMemo(() => shareBy(assetRows, 'broker'), [assetRows]);
+
+  // Money-weighted annualised return; month-level contribution dates are approximated to the 15th
+  const annualised = useMemo(() => {
+    const flows = contributions.filter(c => c.month >= START_MONTH && c.amount)
+      .map(c => ({ date: `${c.month}-15`, amount: -c.amount }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const today = new Date().toISOString().slice(0, 10);
+    if (!flows.length || (new Date(today) - new Date(flows[0].date)) / 86400000 < 60) return null;
+    return xirr([...flows, { date: today, amount: grandTotalEur }]);
+  }, [contributions, grandTotalEur]);
+
+  // Monthly net-worth snapshot (market value included, unlike /balance-history)
+  useEffect(() => {
+    if (snapsLoading || contribLoading || evLoading || !balances.length) return;
+    const ym = new Date().toISOString().slice(0, 7);
+    const entry = {
+      month: ym, liquidity: round2(liquidity), emergency: round2(emergency),
+      invested: round2(grandTotalEur), contributed: round2(grandContributed),
+    };
+    const cur = snaps.find(x => x.month === ym);
+    if (cur && ['liquidity', 'emergency', 'invested', 'contributed'].every(k => cur[k] === entry[k])) return;
+    setSnaps([...snaps.filter(x => x.month !== ym), entry].sort((a, b) => a.month.localeCompare(b.month)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapsLoading, contribLoading, evLoading, balances, grandTotalEur, grandContributed]);
 
   return (
     <div className="h-full overflow-y-auto custom-scrollbar p-3 md:p-6">
@@ -207,12 +194,12 @@ const HomePage = () => {
         </div>
 
         {/* Account balances — bank accounts + portfolio card */}
-        {(balances.length > 0 || hasPortfolio) && (
+        {(bankAccounts.length > 0 || hasPortfolio) && (
           <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
             <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest mb-3 md:mb-4">Account balances</h3>
             <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-3">
               {/* Bank accounts */}
-              {balances.map(acc => (
+              {bankAccounts.map(acc => (
                 <div key={acc.id} className="min-w-0 md:flex-1 md:min-w-[140px] bg-background/50 rounded-lg p-3 md:p-4 border border-white/[0.06]">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-secondary"><AccountIcon name={acc.icon} size={16} /></span>
@@ -257,6 +244,38 @@ const HomePage = () => {
           </div>
         )}
 
+        {/* Net worth split + evolution */}
+        {grandTotal > 0 && (
+          <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5 space-y-4">
+            <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest">Net worth</h3>
+            <div className="flex h-2 rounded-full overflow-hidden bg-white/[0.06]">
+              {split.filter(x => x.value > 0).map(x => (
+                <div key={x.label} style={{ width: `${(x.value / grandTotal) * 100}%`, background: x.color }} />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-secondary">
+              {split.map(x => (
+                <span key={x.label} className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full" style={{ background: x.color }} />
+                  {x.label} <span className="text-white tabular-nums private">{fmtEur(x.value)}</span>
+                  <span className="text-muted">{((x.value / grandTotal) * 100).toFixed(1)}%</span>
+                </span>
+              ))}
+            </div>
+            {snaps.length > 1 && (
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={snaps.map(x => ({ ...x, label: x.month, Total: x.liquidity + x.emergency + x.invested, Contributed: x.contributed }))}>
+                  <XAxis dataKey="label" tick={{ fill: '#3d5a78', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#3d5a78', fontSize: 11 }} axisLine={false} tickLine={false} width={55}
+                    domain={['dataMin', 'dataMax']} tickFormatter={v => `€${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area type="monotone" dataKey="Total" stroke="#00c896" fill="#00c89622" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        )}
+
         {/* Portfolio snapshot */}
         {hasPortfolio && (
           <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5">
@@ -289,6 +308,14 @@ const HomePage = () => {
                   {grandPnlPct != null ? `${pnlSign(grandPnlPct)}${grandPnlPct.toFixed(2)}%` : '—'}
                 </p>
               </div>
+            </div>
+
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-secondary mb-4">
+              <span>Annualised (XIRR): <span className="tabular-nums" style={{ color: pnlColor(annualised) }}>
+                {annualised != null ? `${pnlSign(annualised)}${annualised.toFixed(1)}%` : '—'}</span></span>
+              {brokerShare.map(b => (
+                <span key={b.name}>{b.name}: <span className="text-white tabular-nums">{b.pct.toFixed(1)}%</span></span>
+              ))}
             </div>
 
             {/* Per-asset rows */}

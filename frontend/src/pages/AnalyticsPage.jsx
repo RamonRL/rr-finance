@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../hooks/useStore';
+import { buildHoldings } from '../utils/holdings';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
   LineChart, Line, PieChart, Pie, Cell, CartesianGrid,
@@ -15,7 +16,6 @@ const ALL_CATEGORIES = ['Housing','Food & Groceries','Transport','Health','Enter
 // ── Investments (backend store) ───────────────────────────────────────────────
 const DCA_KEY = 'rr-finance-dca-contributions';
 const EVO_KEY = 'rr-finance-evolution-data';
-const START_MONTH = '2026-02';
 
 
 const fmtEur = (v) => `€${Number(v).toFixed(0)}`;
@@ -57,56 +57,17 @@ export default function AnalyticsPage() {
   const [contributions] = useStore(DCA_KEY, []);
   const [evData] = useStore(EVO_KEY, {});
 
-  const dcaByAsset = useMemo(() => {
-    const map = {};
-    contributions.filter(c => c.month >= START_MONTH).forEach(c => {
-      if (!map[c.assetName]) {
-        map[c.assetName] = { months: {}, participations: {} };
-      }
-      const a = map[c.assetName];
-      a.months[c.month] = (a.months[c.month] || 0) + c.amount;
-      a.participations[c.month] = (a.participations[c.month] || 0) + (c.participations || 0);
-    });
-    return map;
-  }, [contributions]);
-
-  const allDcaMonths = useMemo(() =>
-    [...new Set(contributions.filter(c => c.month >= START_MONTH).map(c => c.month))].sort(),
-  [contributions]);
-
-  const assetNames = useMemo(() => Object.keys(dcaByAsset), [dcaByAsset]);
-
-  // Resolve price for a given asset + month (same logic as EvolutionPage)
-  const resolvePrice = (name, month) => {
-    const ev = evData[`${name}___${month}`];
-    if (ev?.priceIsManual && ev.priceSource !== 'refresh' && ev.price != null) return ev.price;
-    const n = dcaByAsset[name]?.participations?.[month] || 0;
-    const dcaAmt = dcaByAsset[name]?.months?.[month];
-    if (n > 0 && dcaAmt != null) return dcaAmt / n;
-    if (ev?.price != null) return ev.price;
-    return null;
-  };
+  const holdings = useMemo(() => buildHoldings(contributions, evData), [contributions, evData]);
 
   // Compute portfolio value at each balance-history month, merging into the history points
   const enrichedHistory = useMemo(() => {
     if (!balanceHistory.history.length) return [];
     return balanceHistory.history.map(point => {
       const pointKey = `${point.year}-${String(point.month).padStart(2, '0')}`;
-      let portfolioValue = 0;
-      assetNames.forEach(name => {
-        let cumN = 0, latestPrice = null;
-        allDcaMonths.forEach(m => {
-          if (m > pointKey) return;
-          cumN += dcaByAsset[name]?.participations?.[m] || 0;
-          const p = resolvePrice(name, m);
-          if (p != null) latestPrice = p;
-        });
-        portfolioValue += cumN * (latestPrice ?? 0);
-      });
+      const portfolioValue = holdings.valueAt(pointKey);
       return { ...point, Portfolio: portfolioValue, Total: point.Total + portfolioValue };
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [balanceHistory.history, assetNames, dcaByAsset, allDcaMonths, evData]);
+  }, [balanceHistory.history, holdings]);
 
   const hasPortfolioData = enrichedHistory.some(p => p.Portfolio > 0);
 

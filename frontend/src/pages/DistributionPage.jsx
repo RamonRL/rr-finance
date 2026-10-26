@@ -1,17 +1,18 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStore } from '../hooks/useStore';
+import { buildHoldings } from '../utils/holdings';
 import { IconClose, IconPlus, IconCheck } from '../components/icons';
 
 const DCA_KEY    = 'rr-finance-dca-contributions';
 const EVO_KEY    = 'rr-finance-evolution-data';
 const DIST_KEY   = 'rr-finance-distribution-targets';
-const START_MONTH = '2026-02';
 
 const TYPE_COLORS = {
   'Indexed Fund': '#6366f1',
   ETF:    '#00c896',
   Crypto: '#f97316',
   Gold:   '#f0b429',
+  Stock:  '#ec4899',
   Other:  '#7a95b2',
 };
 
@@ -19,7 +20,9 @@ const fmtEur = (v) =>
   new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v ?? 0);
 
 
-const devColor = (dev) => {
+const STOCK_CAP = 4; // max % of the portfolio in single stocks
+
+const devColor =(dev) => {
   if (dev == null) return '#7a95b2';
   const a = Math.abs(dev);
   if (a <= 2) return '#00c896';
@@ -38,26 +41,8 @@ export default function DistributionPage() {
   const [mobileFormOpen, setMobileFormOpen] = useState(false);
 
   // ── DCA-derived data ──────────────────────────────────────────────────────
-  const dcaByAsset = useMemo(() => {
-    const map = {};
-    contributions.filter(c => c.month >= START_MONTH).forEach(c => {
-      if (!map[c.assetName]) {
-        map[c.assetName] = {
-          assetName: c.assetName, ticker: c.ticker,
-          type: c.type, broker: c.broker, months: {}, participations: {},
-        };
-      }
-      const a = map[c.assetName];
-      a.months[c.month] = (a.months[c.month] || 0) + c.amount;
-      a.participations[c.month] = (a.participations[c.month] || 0) + (c.participations || 0);
-      if (c.ticker) a.ticker = c.ticker;
-      a.type = c.type;
-      if (c.broker) a.broker = c.broker;
-    });
-    return map;
-  }, [contributions]);
-
-  const assetNames = useMemo(() => Object.keys(dcaByAsset), [dcaByAsset]);
+  const { dcaByAsset, assetNames, assetRows, grandTotalEur } = useMemo(
+    () => buildHoldings(contributions, evData), [contributions, evData]);
 
   const typeGroups = useMemo(() => {
     const map = {};
@@ -71,42 +56,9 @@ export default function DistributionPage() {
 
   const typeNames = useMemo(() => Object.keys(typeGroups), [typeGroups]);
 
-  // ── Evolution-derived values (price + totalN per asset) ───────────────────
-  const allMonths = useMemo(() =>
-    [...new Set(contributions.filter(c => c.month >= START_MONTH).map(c => c.month))].sort(),
-  [contributions]);
-
-  const getPrice = useCallback((assetName, month) => {
-    const ev = evData[`${assetName}___${month}`];
-    if (ev?.priceIsManual && ev.price != null) return ev.price;
-    const n = dcaByAsset[assetName]?.participations?.[month] || 0;
-    const dcaAmt = dcaByAsset[assetName]?.months[month];
-    if (n > 0 && dcaAmt != null) return dcaAmt / n;
-    if (ev?.price != null) return ev.price;
-    return null;
-  }, [evData, dcaByAsset]);
-
-  const assetValueMap = useMemo(() => {
-    const map = {};
-    assetNames.forEach(name => {
-      let totalN = 0;
-      let lastMonthPrice = null;
-      allMonths.forEach(m => {
-        totalN += dcaByAsset[name]?.participations?.[m] || 0;
-        const p = getPrice(name, m);
-        if (p != null) lastMonthPrice = p;
-      });
-      // ___current key takes priority over per-month derived price
-      const currentOverride = evData[`${name}___current`]?.price ?? null;
-      const latestPrice = currentOverride !== null ? currentOverride : lastMonthPrice;
-      map[name] = { totalN, latestPrice, totalEur: totalN * (latestPrice ?? 0) };
-    });
-    return map;
-  }, [assetNames, dcaByAsset, allMonths, evData, getPrice]);
-
-  const grandTotalEur = useMemo(() =>
-    assetNames.reduce((s, a) => s + (assetValueMap[a]?.totalEur || 0), 0),
-  [assetNames, assetValueMap]);
+  const assetValueMap = useMemo(() => Object.fromEntries(
+    assetRows.map(r => [r.name, { totalN: r.totalN, latestPrice: r.latestPrice, totalEur: r.totalEur }])),
+  [assetRows]);
 
   // ── Left panel inputs ─────────────────────────────────────────────────────
   const [typeInputs, setTypeInputs] = useState({});
@@ -389,6 +341,12 @@ export default function DistributionPage() {
           <h3 className="text-[11px] font-semibold text-secondary uppercase tracking-widest">
             Target distribution
           </h3>
+
+          {(parseFloat(typeInputs.Stock) > STOCK_CAP || (grandTotalEur > 0 && (assetRows.filter(r => r.meta.type === 'Stock').reduce((s, r) => s + r.totalEur, 0) / grandTotalEur) * 100 > STOCK_CAP)) && (
+            <p className="text-xs text-accent-gold bg-accent-gold/[0.07] border border-accent-gold/25 rounded-lg p-2">
+              Single stocks are above your {STOCK_CAP}% cap.
+            </p>
+          )}
 
           <div className="space-y-5">
             {typeNames.map(type => {

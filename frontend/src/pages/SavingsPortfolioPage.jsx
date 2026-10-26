@@ -13,6 +13,7 @@ const CONFIG_KEY        = 'rr-savings-portfolio-config';
 const CONTRIBUTIONS_KEY = 'rr-savings-portfolio-contributions';
 const VALUATIONS_KEY    = 'rr-savings-portfolio-valuations';
 const ARCHIVE_KEY       = 'rr-savings-portfolio-archive';
+const CLOSED_KEY        = 'rr-savings-portfolio-closed';
 const DEPOSITS_KEY      = 'rr-savings-deposits';   // read-only, owned by the Deposits tab
 
 // Written by the old money-market-fund tab; read only by the switch panel below
@@ -184,6 +185,43 @@ function SwitchPanel({ legacy, onConfirm, busy }) {
   );
 }
 
+// ── Close panel ───────────────────────────────────────────────────────────────
+/**
+ * Closing books the realised gain (settled − contributed) as one Savings
+ * transaction. The contributed amount never left the Savings balance, so after
+ * this the balance equals the real cash that landed.
+ */
+function ClosePanel({ contributed, value, onConfirm, busy }) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [settled, setSettled] = useState(String(round2(value)));
+  const amount = parseFloat(settled);
+  const gain = amount - contributed;
+
+  return (
+    <div className="bg-surface border border-red-400/30 rounded-xl p-5 space-y-3">
+      <h3 className="text-white font-semibold">Close the portfolio</h3>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Settlement date">
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
+        </Field>
+        <Field label="Amount that landed (€)">
+          <input type="number" step="0.01" value={settled}
+            onChange={e => setSettled(e.target.value)} className={inputCls} />
+        </Field>
+      </div>
+      <p className="text-xs text-secondary">
+        Books <span className={`private ${gainColor(gain)}`}>{fmtEur(gain || 0)}</span> realised
+        gain on Savings and archives the portfolio. Contributions and valuations are cleared.
+      </p>
+      <button onClick={() => onConfirm({ date, settled: amount })}
+        disabled={!date || !(amount > 0) || busy}
+        className="w-full px-4 py-2.5 bg-red-400/10 border border-red-400/30 text-red-400 text-sm font-semibold rounded-lg hover:bg-red-400/20 transition-colors disabled:opacity-40">
+        {busy ? 'Closing…' : 'Close portfolio'}
+      </button>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function SavingsPortfolioPage() {
   const [config, setConfig] = useStore(CONFIG_KEY, DEFAULT_CONFIG);
@@ -191,6 +229,8 @@ export default function SavingsPortfolioPage() {
   const [valuations, setValuations] = useStore(VALUATIONS_KEY, []);
   const [archive, setArchive, archiveLoading] = useStore(ARCHIVE_KEY, null);
   const [deposits] = useStore(DEPOSITS_KEY, []);
+  const [closed, setClosed] = useStore(CLOSED_KEY, null);
+  const [closing, setClosing] = useState(false);
 
   // Legacy money-market-fund data, read only so the switch panel can close it out
   const [legacyConfig, setLegacyConfig] = useStore(LEGACY_KEYS.config, null);
@@ -271,6 +311,42 @@ export default function SavingsPortfolioPage() {
       refreshBalance();
     } finally {
       setSwitching(false);
+    }
+  };
+
+  const handleClose = async ({ date, settled }) => {
+    const contributed = contributions.reduce((s, c) => s + (c.amount || 0), 0);
+    const gain = round2(settled - contributed);
+    setClosing(true);
+    try {
+      if (gain !== 0) {
+        const res = await fetch(`${API_URL}/transactions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date,
+            description: `${cfg.name || 'Portfolio'} — closing`,
+            amount: Math.abs(gain),
+            type: gain > 0 ? 'income' : 'expense',
+            category: gain > 0 ? 'Investment' : 'Other',
+            account_id: 3,
+          }),
+        });
+        if (!res.ok) throw new Error('Could not book the realised gain');
+      }
+      const dates = [...contributions, ...valuations].map(x => x.date).sort();
+      setClosed({
+        name: cfg.name, broker: cfg.broker,
+        from: dates[0] ?? null, closedOn: date,
+        contributed, finalValue: round2(settled), gain,
+      });
+      setContributions([]);
+      setValuations([]);
+      refreshBalance();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setClosing(false);
     }
   };
 
@@ -522,6 +598,23 @@ export default function SavingsPortfolioPage() {
             onConfirm={handleSwitch}
             busy={switching}
           />
+        )}
+
+        {!needsSwitch && contributions.length > 0 && (
+          <ClosePanel contributed={summary.contributed} value={summary.value}
+            onConfirm={handleClose} busy={closing} />
+        )}
+
+        {closed && (
+          <div className="bg-surface border border-white/10 rounded-xl p-3 md:p-5 text-sm flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <span className="text-white font-medium">{closed.name} — closed</span>
+            <span className="text-xs text-muted">{fmtDate(closed.from)} → {fmtDate(closed.closedOn)}</span>
+            <span className="text-secondary text-xs ml-auto">
+              Contributed <span className="text-white tabular-nums private">{fmtEur(closed.contributed)}</span>
+              {' · '}Settled <span className="text-white tabular-nums private">{fmtEur(closed.finalValue)}</span>
+              {' · '}Gain <span className={`tabular-nums private ${gainColor(closed.gain)}`}>{fmtEur(closed.gain)}</span>
+            </span>
+          </div>
         )}
 
         {/* Header */}

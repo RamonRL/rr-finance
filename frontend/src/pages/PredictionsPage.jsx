@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../hooks/useStore';
 import { getStore } from '../api/store';
+import { buildHoldings, START_MONTH } from '../utils/holdings';
 import {
   AreaChart, Area, BarChart, Bar,
   PieChart, Pie, Cell,
@@ -14,7 +15,6 @@ const PRED_KEY       = 'rr-predictions-config';
 const SNAPSHOTS_KEY  = 'rr-savings-snapshots';
 const DCA_KEY        = 'rr-finance-dca-contributions';
 const EVO_KEY        = 'rr-finance-evolution-data';
-const DCA_START      = '2026-02';
 
 import { API_URL } from '../constants';
 
@@ -191,34 +191,8 @@ export default function PredictionsPage() {
 
   useEffect(() => {
     Promise.all([getStore(DCA_KEY, []), getStore(EVO_KEY, {})]).then(([contributions, evData]) => {
-      const dcaByAsset = {};
-      contributions.filter(c => c.month >= DCA_START).forEach(c => {
-        if (!dcaByAsset[c.assetName]) dcaByAsset[c.assetName] = { months: {}, participations: {} };
-        const a = dcaByAsset[c.assetName];
-        a.months[c.month] = (a.months[c.month] || 0) + c.amount;
-        a.participations[c.month] = (a.participations[c.month] || 0) + (c.participations || 0);
-      });
-      const allMonths = [...new Set(contributions.filter(c => c.month >= DCA_START).map(c => c.month))].sort();
-      let total = 0;
-      Object.keys(dcaByAsset).forEach(name => {
-        let totalN = 0, latestPrice = null;
-        allMonths.forEach(m => {
-          totalN += dcaByAsset[name]?.participations?.[m] || 0;
-          const ev = evData[`${name}___${m}`];
-          let price = null;
-          if (ev?.priceIsManual && ev.priceSource !== 'refresh' && ev.price != null) price = ev.price;
-          else {
-            const n = dcaByAsset[name]?.participations?.[m] || 0;
-            const amt = dcaByAsset[name]?.months?.[m];
-            if (n > 0 && amt != null) price = amt / n;
-            else if (ev?.price != null) price = ev.price;
-          }
-          if (price != null) latestPrice = price;
-        });
-        total += totalN * (latestPrice ?? 0);
-      });
-      setCurrentInvestments(total);
-      const months = contributions.filter(c => c.month >= DCA_START).map(c => c.month).sort();
+      setCurrentInvestments(buildHoldings(contributions, evData).grandTotalEur);
+      const months = contributions.filter(c => c.month >= START_MONTH).map(c => c.month).sort();
       setLatestInvMonth(months[months.length - 1] ?? null);
     });
   }, []);

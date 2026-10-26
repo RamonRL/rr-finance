@@ -3,12 +3,16 @@ import DcaPage from './DcaPage';
 import EvolutionPage from './EvolutionPage';
 import DistributionPage from './DistributionPage';
 import CalculatorPage from './CalculatorPage';
+import RelocatePage from './RelocatePage';
+import PicksPage from './PicksPage';
 
 const SUB_PAGES = [
   { to: '/investments/dca',          label: 'DCA' },
   { to: '/investments/evolution',    label: 'Evolution' },
   { to: '/investments/distribution', label: 'Distribution' },
   { to: '/investments/calculator',   label: 'Calculator' },
+  { to: '/investments/relocate',     label: 'Relocate' },
+  { to: '/investments/picks',        label: 'Picks' },
 ];
 
 const InvestmentsPage = () => (
@@ -43,6 +47,8 @@ const InvestmentsPage = () => (
         <Route path="evolution" element={<EvolutionPage />} />
         <Route path="distribution" element={<DistributionPage />} />
         <Route path="calculator"   element={<CalculatorPage />} />
+        <Route path="relocate"     element={<RelocatePage />} />
+        <Route path="picks"        element={<PicksPage />} />
       </Routes>
     </div>
 
