@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, NaiveDatetime
 from sqlalchemy import text
 from sqlalchemy.pool import NullPool
 from sqlmodel import Field, Session, SQLModel, create_engine, select
@@ -99,7 +99,7 @@ class Transaction(SQLModel, table=True):
     type: str  # "income" | "expense"
     category: str
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: NaiveDatetime = Field(default_factory=datetime.utcnow)
     account_id: int = Field(default=1)
 
 
@@ -110,7 +110,7 @@ class Transfer(SQLModel, table=True):
     amount: float
     date: date
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: NaiveDatetime = Field(default_factory=datetime.utcnow)
 
 
 class Investment(SQLModel, table=True):
@@ -124,7 +124,7 @@ class Investment(SQLModel, table=True):
     current_price: float                 # Latest known price per unit (€), updated manually
     broker: str = "MyInvestor"
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: NaiveDatetime = Field(default_factory=datetime.utcnow)
 
 
 class AppStore(SQLModel, table=True):
