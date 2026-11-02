@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { API_URL } from '../constants';
 import { useStore } from '../hooks/useStore';
+import { buildHoldings } from '../utils/holdings';
 
 const DCA_KEY = 'rr-finance-dca-contributions';
-const START_MONTH = '2026-02';
+const EVO_KEY = 'rr-finance-evolution-data';
 const SAVINGS_ID = 3;
 const INVESTMENTS_ID = 4;
 
@@ -13,15 +14,16 @@ const round2 = (v) => Math.round(v * 100) / 100;
 const inputCls = 'w-full bg-elevated border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-green/50';
 
 /**
- * Moves freed-up Savings cash into the existing DCA assets. Weights default to
- * each asset's share of what has been invested so far, so the current mix is kept.
+ * Books a relocation of Savings cash into the existing DCA assets. Amounts and
+ * participations are typed by hand (fees and transfer losses make exact targets
+ * impossible); the preview only shows the resulting mix, it never blocks.
  */
 export default function RelocatePage() {
   const [contributions, persistContributions] = useStore(DCA_KEY, []);
+  const [evData] = useStore(EVO_KEY, {});
   const [savings, setSavings] = useState(null);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [emergency, setEmergency] = useState('4500');
-  const [weights, setWeights] = useState({});   // assetName -> % override
+  const [amounts, setAmounts] = useState({});   // assetName -> € actually spent
   const [parts, setParts] = useState({});       // assetName -> participations bought
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -33,34 +35,25 @@ export default function RelocatePage() {
       .catch(() => {});
   }, [done]);
 
-  const assets = useMemo(() => {
-    const map = {};
-    contributions.filter(c => c.month >= START_MONTH).forEach(c => {
-      const a = (map[c.assetName] ??= { ...c, cost: 0 });
-      a.cost += c.amount;
-      a.ticker = c.ticker || a.ticker;
-      a.broker = c.broker || a.broker;
-    });
-    return Object.values(map);
-  }, [contributions]);
+  const { assetRows, grandTotalEur } = useMemo(
+    () => buildHoldings(contributions, evData), [contributions, evData]);
 
-  const totalCost = assets.reduce((s, a) => s + a.cost, 0);
-  const available = Math.max(0, round2((savings ?? 0) - (parseFloat(emergency) || 0)));
-
-  const rows = assets.map(a => {
-    const pct = weights[a.assetName] != null
-      ? parseFloat(weights[a.assetName]) || 0
-      : (totalCost > 0 ? (a.cost / totalCost) * 100 : 0);
-    return { ...a, pct, amount: round2((available * pct) / 100) };
+  const num = (v) => parseFloat(v) || 0;
+  const total = round2(assetRows.reduce((s, r) => s + num(amounts[r.name]), 0));
+  const newTotal = grandTotalEur + total;
+  const rows = assetRows.map(r => {
+    const amount = num(amounts[r.name]);
+    return {
+      ...r, amount, participations: num(parts[r.name]),
+      before: grandTotalEur > 0 ? (r.totalEur / grandTotalEur) * 100 : 0,
+      after: newTotal > 0 ? ((r.totalEur + amount) / newTotal) * 100 : 0,
+    };
   });
-  const pctSum = rows.reduce((s, r) => s + r.pct, 0);
-  const valid = available > 0 && Math.abs(pctSum - 100) < 0.01 && !busy;
 
   const confirm_ = async () => {
     setBusy(true);
     try {
       const planned = rows.filter(r => r.amount > 0);
-      const total = round2(planned.reduce((s, r) => s + r.amount, 0));
       const res = await fetch(`${API_URL}/transfers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,9 +67,8 @@ export default function RelocatePage() {
         ...contributions,
         ...planned.map(r => ({
           id: crypto.randomUUID(),
-          assetName: r.assetName, ticker: r.ticker, type: r.type, broker: r.broker,
-          month: date.slice(0, 7), amount: r.amount,
-          participations: parseFloat(parts[r.assetName]) || 0,
+          assetName: r.name, ticker: r.meta.ticker, type: r.meta.type, broker: r.meta.broker,
+          month: date.slice(0, 7), amount: r.amount, participations: r.participations,
         })),
       ]);
       setDone(true);
@@ -105,54 +97,56 @@ export default function RelocatePage() {
               <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
             </div>
             <div>
-              <p className="text-xs text-secondary mb-1">Emergency fund to keep (€)</p>
-              <input type="number" value={emergency} onChange={e => setEmergency(e.target.value)} className={inputCls} />
-            </div>
-            <div>
               <p className="text-xs text-secondary mb-1">Savings balance</p>
               <p className="text-white tabular-nums private py-2">{savings == null ? '—' : fmtEur(savings)}</p>
             </div>
+            <div>
+              <p className="text-xs text-secondary mb-1">Left in Savings after</p>
+              <p className="text-accent-green font-semibold tabular-nums private py-2">{savings == null ? '—' : fmtEur(savings - total)}</p>
+            </div>
           </div>
-          <p className="text-sm text-secondary">
-            To relocate: <span className="text-accent-green font-semibold tabular-nums private">{fmtEur(available)}</span>
-          </p>
         </div>
 
         <div className="bg-surface border border-white/10 rounded-xl p-5 overflow-x-auto">
-          <table className="w-full text-sm min-w-[520px]">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="text-left text-[10px] text-muted uppercase tracking-widest border-b border-white/[0.06]">
-                {['Asset', 'Weight %', 'Amount', 'Participations'].map(h => (
+                {['Asset', 'Spent (€)', 'Participations', 'Avg price', 'Weight now → after'].map(h => (
                   <th key={h} className="pb-2 pr-4 font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.assetName} className="border-b border-white/[0.04]">
-                  <td className="py-2 pr-4 text-white">{r.assetName}</td>
+                <tr key={r.name} className="border-b border-white/[0.04]">
+                  <td className="py-2 pr-4 text-white">{r.name}</td>
                   <td className="py-2 pr-4">
-                    <input type="number" step="0.01" value={weights[r.assetName] ?? r.pct.toFixed(2)}
-                      onChange={e => setWeights(w => ({ ...w, [r.assetName]: e.target.value }))}
-                      className="w-24 bg-elevated border border-white/10 rounded px-2 py-1 text-white" />
+                    <input type="number" step="0.01" value={amounts[r.name] ?? ''}
+                      onChange={e => setAmounts(a => ({ ...a, [r.name]: e.target.value }))}
+                      className="w-28 bg-elevated border border-white/10 rounded px-2 py-1 text-white" />
                   </td>
-                  <td className="py-2 pr-4 tabular-nums private text-white">{fmtEur(r.amount)}</td>
-                  <td className="py-2">
-                    <input type="number" step="any" value={parts[r.assetName] ?? ''}
-                      onChange={e => setParts(p => ({ ...p, [r.assetName]: e.target.value }))}
-                      placeholder="needed for valuation"
-                      className="w-36 bg-elevated border border-white/10 rounded px-2 py-1 text-white" />
+                  <td className="py-2 pr-4">
+                    <input type="number" step="any" value={parts[r.name] ?? ''}
+                      onChange={e => setParts(p => ({ ...p, [r.name]: e.target.value }))}
+                      className="w-32 bg-elevated border border-white/10 rounded px-2 py-1 text-white" />
+                  </td>
+                  <td className="py-2 pr-4 tabular-nums text-secondary private">
+                    {r.amount > 0 && r.participations > 0 ? fmtEur(r.amount / r.participations) : '—'}
+                  </td>
+                  <td className="py-2 tabular-nums text-secondary">
+                    {r.before.toFixed(1)}% → <span className="text-white">{r.after.toFixed(1)}%</span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className={`text-xs mt-3 ${Math.abs(pctSum - 100) < 0.01 ? 'text-muted' : 'text-red-400'}`}>
-            Weights add up to {pctSum.toFixed(2)}% (must be 100%).
+          <p className="text-xs mt-3 text-muted">
+            Total to book: <span className="tabular-nums private text-white">{fmtEur(total)}</span>. The preview is only
+            indicative; amounts don’t need to match any target.
           </p>
         </div>
 
-        <button onClick={confirm_} disabled={!valid}
+        <button onClick={confirm_} disabled={total <= 0 || busy}
           className="w-full px-4 py-2.5 bg-accent-green/10 border border-accent-green/30 text-accent-green text-sm font-semibold rounded-lg hover:bg-accent-green/20 transition-colors disabled:opacity-40">
           {busy ? 'Booking…' : 'Book relocation'}
         </button>
